@@ -159,6 +159,12 @@ export const navigationItems = [
         permission: 'View Tank Stock Ledger',
       },
       {
+        label: 'Out-Turn Report',
+        path: '/out-turn-report',
+        disabled: false,
+        permission: 'View Out-Turn Report',
+      },
+      {
         label: 'User Access Report - Coming Soon',
         path: '',
         disabled: true,

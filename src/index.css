@@ -2038,3 +2038,99 @@ textarea:focus {
   font-size: 13px;
   background: white;
 }
+.summary-card-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(160px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.summary-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.summary-card span {
+  display: block;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.summary-card strong {
+  color: #0f172a;
+  font-size: 20px;
+}
+
+.filter-panel {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.filter-actions {
+  justify-content: flex-end;
+}
+
+.muted-table-text {
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.positive-number {
+  color: #166534;
+  font-weight: 700;
+}
+
+.negative-number {
+  color: #991b1b;
+  font-weight: 700;
+}
+
+@media (max-width: 900px) {
+  .summary-card-grid {
+    grid-template-columns: repeat(2, minmax(160px, 1fr));
+  }
+
+  .filter-panel {
+    grid-template-columns: 1fr;
+  }
+}.view-switcher {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 18px 0 24px;
+}
+
+.view-switcher button {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.view-switcher button:hover {
+  background: #cbd5e1;
+}
+
+.view-switcher .active-view-button {
+  background: #2563eb;
+  color: white;
+}
+
+.view-switcher .active-view-button:hover {
+  background: #1d4ed8;
+}
+
+.positive-number {
+  color: #166534;
+  font-weight: 700;
+}
+
+.negative-number {
+  color: #991b1b;
+  font-weight: 700;
+}

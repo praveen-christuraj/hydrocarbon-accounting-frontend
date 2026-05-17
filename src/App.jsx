@@ -30,6 +30,7 @@ import LocationOperationAvailability from './pages/LocationOperationAvailability
 import LocationOperationSummary from './pages/LocationOperationSummary'
 import OperationTransactionRegister from './pages/OperationTransactionRegister'
 import TankStockLedger from './pages/TankStockLedger'
+import OutTurnReport from './pages/OutTurnReport'
 import OperationTransactionDetail from './pages/OperationTransactionDetail'
 import LoginPage from './pages/LoginPage'
 import PermissionGuard from './components/PermissionGuard'
@@ -792,7 +793,21 @@ function AppContent({
               </PermissionGuard>
             }
           />
-
+          <Route
+            path="/out-turn-report"
+            element={
+              <PermissionGuard
+                loggedInUser={loggedInUser}
+                requiredPermission="View Out-Turn Report"
+                fallbackMessage="You do not have permission to view Out-Turn Report."
+              >
+                <OutTurnReport
+                  locations={locations}
+                  assets={assets}
+                />
+              </PermissionGuard>
+            }
+          />
           <Route
             path="/operation-transactions/:transactionId"
             element={

@@ -256,4 +256,17 @@ export const helpContent = {
       'Comparisons will be auto-generated in the next step (Load After vs Unload Before).',
     ],
   },
+  '/out-turn-report': {
+    title: 'Out-Turn Report Help',
+    description:
+      'Out-Turn Report shows approved Tank Gauging tickets in chronological order and calculates net receipt or dispatch values from previous and current tank stock.',
+    points: [
+      'Tank Gauging quantity is treated as the stock available in the tank after the operation.',
+      'Receipt volume is calculated as current stock after receipt minus previous stock.',
+      'Dispatch volume is calculated as previous stock minus current stock after dispatch.',
+      'Opening and Closing Stock entries are stock declarations and are not treated as receipt or dispatch movement.',
+      'The report uses accounting date, so it respects the location-wise accounting day window such as 06:01 to 06:00 or 08:01 to 08:00.',
+      'The first entry for each tank/product should normally be Opening Stock so previous stock is known.',
+    ],
+  },
 }
