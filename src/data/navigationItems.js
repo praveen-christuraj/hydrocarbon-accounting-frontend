@@ -165,6 +165,12 @@ export const navigationItems = [
         permission: 'View Out-Turn Report',
       },
       {
+        label: 'Material Balance Report',
+        path: '/material-balance-report',
+        disabled: false,
+        permission: 'View Material Balance Report',
+      },
+      {
         label: 'User Access Report - Coming Soon',
         path: '',
         disabled: true,

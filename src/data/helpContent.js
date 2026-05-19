@@ -269,4 +269,19 @@ export const helpContent = {
       'The first entry for each tank/product should normally be Opening Stock so previous stock is known.',
     ],
   },
+
+  '/material-balance-report': {
+    title: 'Material Balance Report Help',
+    description:
+      'Material Balance Report gives date-wise opening, receipt, production, dispatch, draining, closing, and loss/gain values from approved Tank Stock Ledger rows.',
+    points: [
+      'Opening stock is taken from the previous accounting day closing stock.',
+      'Receipt and production are treated as IN movements.',
+      'Dispatch and draining are treated as OUT movements.',
+      'Closing stock is automatically taken from the latest approved tank stock entry of the accounting day.',
+      'If no entry exists on an accounting day, previous closing is carried forward.',
+      'The report respects the location-wise accounting day window such as 06:01 to 06:00 or 08:01 to 08:00.',
+      'CSV export, Excel export, and browser print are standard features for this report.',
+    ],
+  },
 }

@@ -2263,6 +2263,122 @@ textarea:focus {
   }
 }
 
+@media print {
+  .material-balance-report-page,
+  .material-balance-report-page * {
+    visibility: visible !important;
+  }
+
+  .material-balance-report-page {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background: white !important;
+    color: black !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+  }
+
+  .material-balance-report-page form,
+  .material-balance-report-page .page-title,
+  .material-balance-report-page .summary-card-grid,
+  .material-balance-report-page .info-box,
+  .material-balance-report-page button {
+    display: none !important;
+  }
+
+  .material-balance-report-page .print-report-header {
+    display: block !important;
+    margin-bottom: 14px;
+    border-bottom: 2px solid #000;
+    padding-bottom: 10px;
+  }
+
+  .material-balance-report-page .print-report-header h2 {
+    margin: 0;
+    text-align: center;
+    font-size: 18px;
+    color: black !important;
+  }
+
+  .material-balance-report-page .print-report-meta {
+    color: black !important;
+  }
+
+  .material-balance-report-page .print-summary-grid div {
+    border: 1px solid #000;
+    border-radius: 0;
+    color: black !important;
+  }
+
+  .material-balance-report-page .print-summary-grid span,
+  .material-balance-report-page .print-summary-grid strong {
+    color: black !important;
+  }
+
+  .material-balance-report-page .section-title {
+    margin-top: 12px;
+    margin-bottom: 8px;
+  }
+
+  .material-balance-report-page .section-title h3 {
+    margin: 0;
+    font-size: 14px;
+    color: black !important;
+  }
+
+  .material-balance-report-page .section-title p {
+    font-size: 11px;
+    color: black !important;
+  }
+
+  .material-balance-report-page table {
+    display: table !important;
+    width: 100%;
+    border-collapse: collapse;
+    page-break-inside: auto;
+    white-space: normal !important;
+    overflow: visible !important;
+  }
+
+  .material-balance-report-page thead {
+    display: table-header-group;
+    background: #e5e7eb !important;
+    color: black !important;
+  }
+
+  .material-balance-report-page tbody {
+    display: table-row-group;
+  }
+
+  .material-balance-report-page tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  .material-balance-report-page th,
+  .material-balance-report-page td {
+    border: 1px solid #000;
+    padding: 4px;
+    font-size: 7px;
+    color: black !important;
+    vertical-align: top;
+  }
+
+  .material-balance-report-page th {
+    background: #e5e7eb !important;
+    font-weight: 700;
+  }
+
+  @page {
+    size: A4 landscape;
+    margin: 10mm;
+  }
+}
+
 .export-view-button {
   background: #059669;
   color: white;

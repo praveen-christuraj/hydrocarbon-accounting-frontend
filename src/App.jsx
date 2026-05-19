@@ -31,6 +31,7 @@ import LocationOperationSummary from './pages/LocationOperationSummary'
 import OperationTransactionRegister from './pages/OperationTransactionRegister'
 import TankStockLedger from './pages/TankStockLedger'
 import OutTurnReport from './pages/OutTurnReport'
+import MaterialBalanceReport from './pages/MaterialBalanceReport'
 import OperationTransactionDetail from './pages/OperationTransactionDetail'
 import LoginPage from './pages/LoginPage'
 import PermissionGuard from './components/PermissionGuard'
@@ -805,6 +806,18 @@ function AppContent({
                   locations={locations}
                   assets={assets}
                 />
+              </PermissionGuard>
+            }
+          />
+          <Route
+            path="/material-balance-report"
+            element={
+              <PermissionGuard
+                loggedInUser={loggedInUser}
+                requiredPermission="View Material Balance Report"
+                fallbackMessage="You do not have permission to view Material Balance Report."
+              >
+                <MaterialBalanceReport locations={locations} assets={assets} />
               </PermissionGuard>
             }
           />
