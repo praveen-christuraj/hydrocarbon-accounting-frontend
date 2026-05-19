@@ -339,8 +339,17 @@ function OutTurnReport({ locations, assets }) {
     XLSX.writeFile(workbook, 'out-turn-report.xlsx')
   }
 
+  const handlePrintReport = () => {
+    if (rows.length === 0) {
+      alert('No OTR rows available to print')
+      return
+    }
+
+    window.print()
+  }
+
   return (
-    <div>
+    <div className="out-turn-report-page">
       <div className="page-title">
         <div>
           <h2>Out-Turn Report</h2>
@@ -462,6 +471,12 @@ function OutTurnReport({ locations, assets }) {
             Export Excel
           </button>
         </div>
+
+        <div className="filter-actions">
+          <button type="button" onClick={handlePrintReport} disabled={loading}>
+            Print Report
+          </button>
+        </div>
       </form>
       <div className="summary-card-grid">
         <div className="summary-card">
@@ -489,6 +504,65 @@ function OutTurnReport({ locations, assets }) {
         <div className="summary-card">
           <span>Latest Stock MT</span>
           <strong>{formatNumber(totals.lastStockMt)}</strong>
+        </div>
+      </div>
+
+      <div className="print-report-header">
+        <h2>Out-Turn Report</h2>
+
+        <div className="print-report-meta">
+          <span>
+            <strong>Location:</strong>{' '}
+            {filters.locationCode || 'All Locations'}
+          </span>
+
+          <span>
+            <strong>Tank:</strong> {filters.tankAssetCode || 'All Tanks'}
+          </span>
+
+          <span>
+            <strong>Product:</strong> {filters.productName || 'All Products'}
+          </span>
+
+          <span>
+            <strong>Accounting Date:</strong> {filters.dateFrom || '-'} to{' '}
+            {filters.dateTo || '-'}
+          </span>
+
+          <span>
+            <strong>Status:</strong> {filters.status || 'All Statuses'}
+          </span>
+
+          <span>
+            <strong>Printed:</strong> {new Date().toLocaleString()}
+          </span>
+        </div>
+
+        <div className="print-summary-grid">
+          <div>
+            <span>Total Receipt NSV</span>
+            <strong>{formatNumber(totals.totalReceiptNsvBbl)}</strong>
+          </div>
+
+          <div>
+            <span>Total Dispatch NSV</span>
+            <strong>{formatNumber(totals.totalDispatchNsvBbl)}</strong>
+          </div>
+
+          <div>
+            <span>Net Movement NSV</span>
+            <strong>{formatNumber(totals.netMovementNsvBbl)}</strong>
+          </div>
+
+          <div>
+            <span>Latest Stock NSV</span>
+            <strong>{formatNumber(totals.lastStockNsvBbl)}</strong>
+          </div>
+
+          <div>
+            <span>Latest Stock MT</span>
+            <strong>{formatNumber(totals.lastStockMt)}</strong>
+          </div>
         </div>
       </div>
 

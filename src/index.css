@@ -2092,6 +2092,177 @@ textarea:focus {
   font-weight: 700;
 }
 
+/* ===== Printable Out-Turn Report ===== */
+.print-report-header {
+  display: none;
+}
+
+.print-report-meta {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px 18px;
+  margin-top: 10px;
+  font-size: 12px;
+}
+
+.print-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.print-summary-grid div {
+  border: 1px solid #cbd5e1;
+  padding: 8px;
+  border-radius: 6px;
+}
+
+.print-summary-grid span {
+  display: block;
+  font-size: 11px;
+  color: #475569;
+  font-weight: 700;
+}
+
+.print-summary-grid strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 14px;
+  color: #0f172a;
+}
+
+@media print {
+  /* Existing report CSS hides all body content using visibility:hidden.
+     This restores only the OTR page when printing OTR. */
+  .out-turn-report-page,
+  .out-turn-report-page * {
+    visibility: visible !important;
+  }
+
+  .out-turn-report-page {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background: white !important;
+    color: black !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+  }
+
+  .out-turn-report-page form,
+  .out-turn-report-page .page-title,
+  .out-turn-report-page .summary-card-grid,
+  .out-turn-report-page .info-box,
+  .out-turn-report-page button {
+    display: none !important;
+  }
+
+  .out-turn-report-page .print-report-header {
+    display: block !important;
+    margin-bottom: 14px;
+    border-bottom: 2px solid #000;
+    padding-bottom: 10px;
+  }
+
+  .out-turn-report-page .print-report-header h2 {
+    margin: 0;
+    text-align: center;
+    font-size: 18px;
+    color: black !important;
+  }
+
+  .out-turn-report-page .print-report-meta {
+    color: black !important;
+  }
+
+  .out-turn-report-page .print-summary-grid div {
+    border: 1px solid #000;
+    border-radius: 0;
+    color: black !important;
+  }
+
+  .out-turn-report-page .print-summary-grid span,
+  .out-turn-report-page .print-summary-grid strong {
+    color: black !important;
+  }
+
+  .out-turn-report-page .section-title {
+    margin-top: 12px;
+    margin-bottom: 8px;
+  }
+
+  .out-turn-report-page .section-title h3 {
+    margin: 0;
+    font-size: 14px;
+    color: black !important;
+  }
+
+  .out-turn-report-page .section-title p {
+    font-size: 11px;
+    color: black !important;
+  }
+
+  .out-turn-report-page table {
+    display: table !important;
+    width: 100%;
+    border-collapse: collapse;
+    page-break-inside: auto;
+    white-space: normal !important;
+    overflow: visible !important;
+  }
+
+  .out-turn-report-page thead {
+    display: table-header-group;
+    background: #e5e7eb !important;
+    color: black !important;
+  }
+
+  .out-turn-report-page tbody {
+    display: table-row-group;
+  }
+
+  .out-turn-report-page tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  .out-turn-report-page th,
+  .out-turn-report-page td {
+    border: 1px solid #000;
+    padding: 4px;
+    font-size: 8px;
+    color: black !important;
+    vertical-align: top;
+  }
+
+  .out-turn-report-page th {
+    background: #e5e7eb !important;
+    font-weight: 700;
+  }
+
+  .out-turn-report-page .status-badge,
+  .out-turn-report-page .permission-badge {
+    background: transparent !important;
+    color: black !important;
+    padding: 0;
+    font-size: 8px;
+  }
+
+  .out-turn-report-page .muted-table-text {
+    color: black !important;
+    font-size: 7px;
+  }
+
+  @page {
+    size: A4 landscape;
+    margin: 10mm;
+  }
+}
+
 .export-view-button {
   background: #059669;
   color: white;
@@ -2102,6 +2273,20 @@ textarea:focus {
 }
 
 .export-view-button:disabled {
+  background: #94a3b8;
+  cursor: not-allowed;
+}
+
+.export-excel-button {
+  background: #7c3aed;
+  color: white;
+}
+
+.export-excel-button:hover {
+  background: #6d28d9;
+}
+
+.export-excel-button:disabled {
   background: #94a3b8;
   cursor: not-allowed;
 }

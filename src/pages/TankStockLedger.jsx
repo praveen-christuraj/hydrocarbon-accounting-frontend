@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import * as XLSX from 'xlsx'
 import {
   getTankStockLedger,
   getTankStockLedgerDailySummary,
@@ -394,6 +395,158 @@ function TankStockLedger({ locations, assets }) {
     }
   }
 
+  const handleExportExcel = () => {
+    if (
+      dailySummaryRows.length === 0 &&
+      summaryRows.length === 0 &&
+      ledgerRows.length === 0
+    ) {
+      alert('No Tank Stock Ledger rows available to export')
+      return
+    }
+
+    const dailySummaryExportRows = dailySummaryRows.map((row) => ({
+      'Accounting Date': row.accountingDate,
+      'Location Code': row.locationCode,
+      'Location Name': row.locationName,
+      'Tank Asset Code': row.tankAssetCode,
+      'Tank Asset Name': row.tankAssetName,
+      Product: row.productName || '',
+      'Opening NSV': Number(row.openingNsvBbl || 0),
+      'Total In NSV': Number(row.totalInNsvBbl || 0),
+      'Total Out NSV': Number(row.totalOutNsvBbl || 0),
+      'Book Closing NSV': Number(row.bookClosingNsvBbl || 0),
+      'Actual Closing NSV': Number(row.actualClosingNsvBbl || 0),
+      'Loss Gain NSV': Number(row.lossGainNsvBbl || 0),
+      'Closing LT': Number(row.actualClosingLt || 0),
+      'Closing MT': Number(row.actualClosingMt || 0),
+      'Rows Count': Number(row.rowsCount || 0),
+      'Last Ticket': row.lastTicketNumber || '',
+    }))
+
+    const stockSummaryExportRows = summaryRows.map((row) => ({
+      'Location Code': row.locationCode,
+      'Location Name': row.locationName,
+      'Tank Asset Code': row.tankAssetCode,
+      'Tank Asset Name': row.tankAssetName,
+      Product: row.productName || '',
+      'Opening NSV': Number(row.openingNsvBbl || 0),
+      'Total In NSV': Number(row.totalInNsvBbl || 0),
+      'Total Out NSV': Number(row.totalOutNsvBbl || 0),
+      'Closing NSV': Number(row.closingNsvBbl || 0),
+      'Closing LT': Number(row.closingLt || 0),
+      'Closing MT': Number(row.closingMt || 0),
+    }))
+
+    const ledgerDetailsExportRows = ledgerRows.map((row) => ({
+      'Accounting Date': row.accountingDate || '',
+      'Operation Date': row.operationDate,
+      'Ticket Number': row.ticketNumber,
+      'Operation Number': row.operationNumber,
+      'Location Code': row.locationCode,
+      'Location Name': row.locationName,
+      'Tank Asset Code': row.tankAssetCode,
+      'Tank Asset Name': row.tankAssetName,
+      Product: row.productName || '',
+      'Operation Label': row.tankOperationLabel,
+      'Operation Category': row.tankOperationCategory,
+      'Operation Sign': row.tankOperationSign,
+      'Movement NSV': Number(row.movementNsvBbl || 0),
+      'Running Balance NSV': Number(row.runningBalanceNsvBbl || 0),
+      'Movement LT': Number(row.movementLt || 0),
+      'Running Balance LT': Number(row.runningBalanceLt || 0),
+      'Movement MT': Number(row.movementMt || 0),
+      'Running Balance MT': Number(row.runningBalanceMt || 0),
+      Status: row.status,
+    }))
+
+    const filterExportRows = [
+      {
+        Filter: 'Location',
+        Value: filters.locationCode || 'All Locations',
+      },
+      {
+        Filter: 'Tank Asset',
+        Value: filters.tankAssetCode || 'All Tanks',
+      },
+      {
+        Filter: 'Product',
+        Value: filters.productName || 'All Products',
+      },
+      {
+        Filter: 'Accounting Date From',
+        Value: filters.dateFrom || '',
+      },
+      {
+        Filter: 'Accounting Date To',
+        Value: filters.dateTo || '',
+      },
+      {
+        Filter: 'Status',
+        Value: filters.status || 'All Statuses',
+      },
+    ]
+
+    const overallSummaryRows = [
+      {
+        Particular: 'Daily Summary Total In NSV',
+        Value: Number(dailyTotals.totalInNsvBbl || 0),
+      },
+      {
+        Particular: 'Daily Summary Total Out NSV',
+        Value: Number(dailyTotals.totalOutNsvBbl || 0),
+      },
+      {
+        Particular: 'Daily Summary Final Closing NSV',
+        Value: Number(dailyTotals.finalClosingNsvBbl || 0),
+      },
+      {
+        Particular: 'Daily Summary Loss / Gain NSV',
+        Value: Number(dailyTotals.lossGainNsvBbl || 0),
+      },
+      {
+        Particular: 'Daily Summary Final Closing MT',
+        Value: Number(dailyTotals.finalClosingMt || 0),
+      },
+      {
+        Particular: 'Stock Summary Opening NSV',
+        Value: Number(totals.openingNsvBbl || 0),
+      },
+      {
+        Particular: 'Stock Summary Total In NSV',
+        Value: Number(totals.totalInNsvBbl || 0),
+      },
+      {
+        Particular: 'Stock Summary Total Out NSV',
+        Value: Number(totals.totalOutNsvBbl || 0),
+      },
+      {
+        Particular: 'Stock Summary Closing NSV',
+        Value: Number(totals.closingNsvBbl || 0),
+      },
+    ]
+
+    const workbook = XLSX.utils.book_new()
+
+    const dailySummarySheet = XLSX.utils.json_to_sheet(dailySummaryExportRows)
+    const stockSummarySheet = XLSX.utils.json_to_sheet(stockSummaryExportRows)
+    const ledgerDetailsSheet = XLSX.utils.json_to_sheet(ledgerDetailsExportRows)
+    const overallSummarySheet = XLSX.utils.json_to_sheet(overallSummaryRows)
+    const filtersSheet = XLSX.utils.json_to_sheet(filterExportRows)
+
+    XLSX.utils.book_append_sheet(workbook, dailySummarySheet, 'Daily Summary')
+    XLSX.utils.book_append_sheet(workbook, stockSummarySheet, 'Stock Summary')
+    XLSX.utils.book_append_sheet(workbook, ledgerDetailsSheet, 'Ledger Details')
+    XLSX.utils.book_append_sheet(
+      workbook,
+      overallSummarySheet,
+      'Overall Summary'
+    )
+    XLSX.utils.book_append_sheet(workbook, filtersSheet, 'Filters')
+
+    XLSX.writeFile(workbook, 'tank-stock-ledger.xlsx')
+  }
+
   return (
     <div>
       <div className="page-title">
@@ -576,6 +729,15 @@ function TankStockLedger({ locations, assets }) {
           Export Current View CSV
         </button>
       </div>
+        <button
+          type="button"
+          className="export-excel-button"
+          onClick={handleExportExcel}
+          disabled={loading}
+        >
+          Export Excel Workbook
+        </button>
+
 
       {activeView === 'daily-summary' && (
         <>
