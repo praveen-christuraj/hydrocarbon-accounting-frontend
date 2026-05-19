@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import * as XLSX from 'xlsx'
 import { getOutTurnReport } from '../api/outTurnReportApi'
 
 function OutTurnReport({ locations, assets }) {
@@ -246,6 +247,98 @@ function OutTurnReport({ locations, assets }) {
     downloadCsv('out-turn-report.csv', headers, dataRows)
   }
 
+  const handleExportExcel = () => {
+    if (rows.length === 0) {
+      alert('No OTR rows available to export')
+      return
+    }
+
+    const exportRows = rows.map((row) => ({
+      'Accounting Date': row.accountingDate,
+      'Operation Date/Time': formatDateTime(row.operationDatetime),
+      'Ticket Number': row.ticketNumber,
+      'Operation Number': row.operationNumber,
+      'Location Code': row.locationCode,
+      'Location Name': row.locationName,
+      'Tank Asset Code': row.tankAssetCode,
+      'Tank Asset Name': row.tankAssetName,
+      Product: row.productName || '',
+      'Operation Label': row.tankOperationLabel,
+      'Operation Category': row.tankOperationCategory,
+      'Operation Sign': row.tankOperationSign,
+      'Previous NSV': Number(row.previousStockNsvBbl || 0),
+      'Stock After NSV': Number(row.stockAfterNsvBbl || 0),
+      'Net Receipt NSV': Number(row.netReceiptNsvBbl || 0),
+      'Net Dispatch NSV': Number(row.netDispatchNsvBbl || 0),
+      'Signed Net NSV': Number(row.signedNetMovementNsvBbl || 0),
+      'Stock After LT': Number(row.stockAfterLt || 0),
+      'Stock After MT': Number(row.stockAfterMt || 0),
+      Status: row.status,
+    }))
+
+    const summaryRows = [
+      {
+        Particular: 'Total Receipt NSV',
+        Value: Number(totals.totalReceiptNsvBbl || 0),
+      },
+      {
+        Particular: 'Total Dispatch NSV',
+        Value: Number(totals.totalDispatchNsvBbl || 0),
+      },
+      {
+        Particular: 'Net Movement NSV',
+        Value: Number(totals.netMovementNsvBbl || 0),
+      },
+      {
+        Particular: 'Latest Stock NSV',
+        Value: Number(totals.lastStockNsvBbl || 0),
+      },
+      {
+        Particular: 'Latest Stock MT',
+        Value: Number(totals.lastStockMt || 0),
+      },
+    ]
+
+    const filterRows = [
+      {
+        Filter: 'Location',
+        Value: filters.locationCode || 'All Locations',
+      },
+      {
+        Filter: 'Tank Asset',
+        Value: filters.tankAssetCode || 'All Tanks',
+      },
+      {
+        Filter: 'Product',
+        Value: filters.productName || 'All Products',
+      },
+      {
+        Filter: 'Accounting Date From',
+        Value: filters.dateFrom || '',
+      },
+      {
+        Filter: 'Accounting Date To',
+        Value: filters.dateTo || '',
+      },
+      {
+        Filter: 'Status',
+        Value: filters.status || 'All Statuses',
+      },
+    ]
+
+    const workbook = XLSX.utils.book_new()
+
+    const reportSheet = XLSX.utils.json_to_sheet(exportRows)
+    const summarySheet = XLSX.utils.json_to_sheet(summaryRows)
+    const filtersSheet = XLSX.utils.json_to_sheet(filterRows)
+
+    XLSX.utils.book_append_sheet(workbook, reportSheet, 'OTR Details')
+    XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary')
+    XLSX.utils.book_append_sheet(workbook, filtersSheet, 'Filters')
+
+    XLSX.writeFile(workbook, 'out-turn-report.xlsx')
+  }
+
   return (
     <div>
       <div className="page-title">
@@ -361,6 +454,12 @@ function OutTurnReport({ locations, assets }) {
         <div className="filter-actions">
           <button type="button" onClick={handleExportCsv} disabled={loading}>
             Export CSV
+          </button>
+        </div>
+
+        <div className="filter-actions">
+          <button type="button" onClick={handleExportExcel} disabled={loading}>
+            Export Excel
           </button>
         </div>
       </form>
