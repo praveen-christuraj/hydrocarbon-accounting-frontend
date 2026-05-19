@@ -9,7 +9,8 @@ import {
 } from '../api/operationEntryApi'
 import TankGaugingLayout from '../components/operationLayouts/TankGaugingLayout'
 import MultiTankBeforeAfterLayout from '../components/operationLayouts/MultiTankBeforeAfterLayout'
-
+import TankerTruckLayout from '../components/operationLayouts/TankerTruckLayout'
+  
 function LayoutSummaryPanel({ selectedTemplate }) {
   if (!selectedTemplate) {
     return null
@@ -333,49 +334,39 @@ function OperationLayoutRenderer({
     )
   }
 
-  if (layoutType === 'Tanker Loading') {
-    return (
-      <>
-        <LayoutPlaceholder
-          title="Tanker Loading Layout"
-          description="Designed for road tanker loading or receipt with compartment dip, quality, volume and seal details."
-          sections={[
-            {
-              title: 'Tanker Details',
-              items: [
-                'Tanker asset',
-                'Prime mover',
-                'Convoy number',
-                'Destination',
-              ],
-            },
-            {
-              title: 'Dip & Quality',
-              items: [
-                'Compartment',
-                'Total dip',
-                'Water dip',
-                'API/density',
-                'Temperature',
-              ],
-            },
-            {
-              title: 'Seal & Results',
-              items: ['Seal numbers', 'GOV', 'GSV', 'NSV', 'MT', 'LT'],
-            },
-          ]}
-        />
+    const hasTankerPayloadField = entry.values.some((value) => {
+      return value.fieldCode === 'tanker_payload'
+    })
 
-        <OperationTemplateFields
-          entry={entry}
-          selectedTemplate={selectedTemplate}
-          selectedTemplateFields={selectedTemplateFields}
-          handleValueChange={handleValueChange}
-          getInputType={getInputType}
-        />
-      </>
-    )
-  }
+    const isTankerLayout =
+      normalizedLayoutType === 'tanker loading' ||
+      normalizedCalculationEngine === 'tanker quantity' ||
+      hasTankerPayloadField
+
+    if (isTankerLayout) {
+      return (
+        <>
+          <TankerTruckLayout
+            key={`tanker-truck-${editId ?? 'new'}-${entry.operationTemplateId}-${entry.primaryAssetCode}`}
+            entry={entry}
+            editId={editId}
+            selectedAsset={selectedAsset}
+            assetCalibrationTables={assetCalibrationTables}
+            calibrationTemplates={calibrationTemplates}
+            handleValueChange={handleValueChange}
+          />
+
+          <OperationTemplateFields
+            entry={entry}
+            selectedTemplate={selectedTemplate}
+            selectedTemplateFields={selectedTemplateFields}
+            handleValueChange={handleValueChange}
+            getInputType={getInputType}
+            excludedFieldCodes={['tanker_payload']}
+          />
+        </>
+      )
+    }
 
   if (layoutType === 'Meter Reading') {
     return (
@@ -755,12 +746,40 @@ function OperationEntry({
     return missing
   }
 
-  const validateAssetSpecificMandatory = (entryValues) => {
-    const tankPayloadRaw = entryValues.find((v) => v.fieldCode === 'tank_gauging_payload')?.fieldValue
-    const multiTankPayloadRaw = entryValues.find((v) => v.fieldCode === 'multi_tank_payload')?.fieldValue
+  const validateTankerMandatory = (tankerPayload) => {
+    const inputs = tankerPayload?.inputs || {}
 
-    const tankPayload = parseFieldObject(tankPayloadRaw)
-    const multiTankPayload = parseFieldObject(multiTankPayloadRaw)
+    const missing = []
+
+    if (isBlank(inputs.tankerTransactionDate)) missing.push('Tanker Date')
+    if (isBlank(inputs.tankerTransactionTime)) missing.push('Tanker Time')
+    if (isBlank(inputs.convoyNumber)) missing.push('Convoy Number')
+    if (isBlank(inputs.compartment)) missing.push('Compartment / Manhole')
+    if (isBlank(inputs.totalDipCm)) missing.push('Total Dip (cm)')
+    if (isBlank(inputs.waterDipCm)) missing.push('Water Dip (cm)')
+    if (isBlank(inputs.bswPercent)) missing.push('BS&W %')
+    if (isBlank(inputs.tankTemperature)) missing.push('Tank Temperature')
+    if (isBlank(inputs.sampleTemperature)) missing.push('Sample Temperature')
+
+    const mode = String(inputs.observedInputType || '').toLowerCase()
+
+    if (mode.includes('api')) {
+      if (isBlank(inputs.observedApi)) missing.push('Observed API')
+    } else {
+      if (isBlank(inputs.observedDensity)) missing.push('Observed Density')
+    }
+
+    return missing
+  }
+
+    const validateAssetSpecificMandatory = (entryValues) => {
+      const tankPayloadRaw = entryValues.find((v) => v.fieldCode === 'tank_gauging_payload')?.fieldValue
+      const multiTankPayloadRaw = entryValues.find((v) => v.fieldCode === 'multi_tank_payload')?.fieldValue
+      const tankerPayloadRaw = entryValues.find((v) => v.fieldCode === 'tanker_payload')?.fieldValue
+
+      const tankPayload = parseFieldObject(tankPayloadRaw)
+      const multiTankPayload = parseFieldObject(multiTankPayloadRaw)
+      const tankerPayload = parseFieldObject(tankerPayloadRaw)
 
     if (tankPayload) {
       const missing = validateTankGaugingMandatory(tankPayload)
@@ -773,6 +792,13 @@ function OperationEntry({
       const missing = validateMultiTankMandatory(multiTankPayload)
       if (missing.length > 0) {
         return `Multi-Tank mandatory sections missing: ${missing.slice(0, 10).join(', ')}${missing.length > 10 ? ' ...' : ''}`
+      }
+    }
+
+    if (tankerPayload) {
+      const missing = validateTankerMandatory(tankerPayload)
+      if (missing.length > 0) {
+        return `Tanker mandatory sections missing: ${missing.slice(0, 10).join(', ')}${missing.length > 10 ? ' ...' : ''}`
       }
     }
 
@@ -796,12 +822,15 @@ function OperationEntry({
       alert('Primary Asset is required')
       return
     }
-    const needsConvoyNumber = String(selectedTemplate?.entryLayoutType || '')
+    const selectedLayoutType = String(selectedTemplate?.entryLayoutType || '')
       .toLowerCase()
-      .includes('multi-tank')
+
+    const needsConvoyNumber =
+      selectedLayoutType.includes('multi-tank') ||
+      selectedLayoutType.includes('tanker')
 
     if (needsConvoyNumber && entry.convoyNumber.trim() === '') {
-      alert('Convoy Number is required for Multi-Tank operations')
+      alert('Convoy Number is required for Multi-Tank / Tanker operations')
       return
     }
     if (entry.originLocationCode.trim() === '') {
@@ -859,6 +888,14 @@ function OperationEntry({
       const hasMultiTankPayload = (entry.values || []).some((v) => v.fieldCode === 'multi_tank_payload')
       if (!hasMultiTankPayload) {
         alert('Template setup required: Add System field "multi_tank_payload" in Operation Template.')
+        return
+      }
+    }
+
+    if (layoutType === 'Tanker Loading') {
+      const hasTankerPayload = (entry.values || []).some((v) => v.fieldCode === 'tanker_payload')
+      if (!hasTankerPayload) {
+        alert('Template setup required: Add System field "tanker_payload" in Operation Template.')
         return
       }
     }
@@ -1024,9 +1061,10 @@ function OperationEntry({
     setEntry(emptyEntry)
     setEditId(null)
   }
-  const showConvoyNumber = String(selectedTemplate?.entryLayoutType || '')
-    .toLowerCase()
-    .includes('multi-tank')
+  const showConvoyNumber = (() => {
+    const layout = String(selectedTemplate?.entryLayoutType || '').toLowerCase()
+    return layout.includes('multi-tank') || layout.includes('tanker')
+  })()
 
   return (
     <div>

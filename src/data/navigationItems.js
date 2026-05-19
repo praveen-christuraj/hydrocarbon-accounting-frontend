@@ -70,6 +70,12 @@ export const navigationItems = [
         permission: 'View Asset',
       },
       {
+        label: 'Prime Mover - Tanker Link',
+        path: '/prime-mover-tanker-links',
+        disabled: false,
+        permission: 'View Asset',
+      },
+      {
         label: 'Calibration Template Master',
         path: '/calibration-templates',
         disabled: false,
@@ -169,6 +175,11 @@ export const navigationItems = [
         path: '/material-balance-report',
         disabled: false,
         permission: 'View Material Balance Report',
+      },
+      {
+        label: 'Tanker Transaction Report',
+        path: '/tanker-transaction-report',
+        disabled: false,
       },
       {
         label: 'User Access Report - Coming Soon',

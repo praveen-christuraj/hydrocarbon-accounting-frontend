@@ -41,6 +41,8 @@ import CompanyReportProfileMaster from './pages/CompanyReportProfileMaster'
 import AuditLog from './pages/AuditLog'
 import BargeSealMaster from './pages/BargeSealMaster'
 import ConvoyTracker from './pages/ConvoyTracker'
+import TankerTransactionReport from './pages/TankerTransactionReport'
+import PrimeMoverTankerLinkMaster from './pages/PrimeMoverTankerLinkMaster'
 
 import { getCurrentUser, logoutUser } from './api/authApi'
 import { getLocationOperationAvailability } from './api/locationOperationAvailabilityApi'
@@ -508,7 +510,21 @@ function AppContent({
               </PermissionGuard>
             }
           />
-
+          <Route
+            path="/prime-mover-tanker-links"
+            element={
+              <PermissionGuard
+                loggedInUser={loggedInUser}
+                requiredPermission="View Asset"
+                fallbackMessage="You do not have permission to view Prime Mover - Tanker links."
+              >
+                <PrimeMoverTankerLinkMaster
+                  assets={assets}
+                  loggedInUser={loggedInUser}
+                />
+              </PermissionGuard>
+            }
+          />
           <Route
             path="/calibration-templates"
             element={
@@ -833,6 +849,15 @@ function AppContent({
               >
                 <MaterialBalanceReport locations={locations} assets={assets} />
               </PermissionGuard>
+            }
+          />
+          <Route
+            path="/tanker-transaction-report"
+            element={
+              <TankerTransactionReport
+                locations={locations}
+                assets={assets}
+              />
             }
           />
           <Route
