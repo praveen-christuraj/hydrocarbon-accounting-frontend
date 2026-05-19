@@ -9,9 +9,12 @@ function MaterialBalanceReport({ locations, assets }) {
     productName: '',
     dateFrom: '',
     dateTo: '',
+    unit: 'nsv',
   }
 
   const [filters, setFilters] = useState(emptyFilters)
+  const [template, setTemplate] = useState(null)
+  const [columns, setColumns] = useState([])
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(false)
 
@@ -33,45 +36,86 @@ function MaterialBalanceReport({ locations, assets }) {
     })
   }, [assets, filters.locationCode])
 
-  const totals = useMemo(() => {
-    return rows.reduce(
-      (accumulator, row) => {
-        accumulator.openingNsvBbl += row.openingNsvBbl
-        accumulator.receiptNsvBbl += row.receiptNsvBbl
-        accumulator.productionNsvBbl += row.productionNsvBbl
-        accumulator.dispatchNsvBbl += row.dispatchNsvBbl
-        accumulator.drainingNsvBbl += row.drainingNsvBbl
-        accumulator.otherInNsvBbl += row.otherInNsvBbl
-        accumulator.otherOutNsvBbl += row.otherOutNsvBbl
-        accumulator.totalInNsvBbl += row.totalInNsvBbl
-        accumulator.totalOutNsvBbl += row.totalOutNsvBbl
-        accumulator.lossGainNsvBbl += row.lossGainNsvBbl
-
-        accumulator.finalClosingNsvBbl = row.actualClosingNsvBbl
-        accumulator.finalClosingLt = row.actualClosingLt
-        accumulator.finalClosingMt = row.actualClosingMt
-
-        return accumulator
-      },
-      {
-        openingNsvBbl: 0,
-        receiptNsvBbl: 0,
-        productionNsvBbl: 0,
-        dispatchNsvBbl: 0,
-        drainingNsvBbl: 0,
-        otherInNsvBbl: 0,
-        otherOutNsvBbl: 0,
-        totalInNsvBbl: 0,
-        totalOutNsvBbl: 0,
-        lossGainNsvBbl: 0,
-        finalClosingNsvBbl: 0,
-        finalClosingLt: 0,
-        finalClosingMt: 0,
+  const sortedColumns = useMemo(() => {
+    return [...columns].sort((a, b) => {
+      if (a.columnOrder !== b.columnOrder) {
+        return a.columnOrder - b.columnOrder
       }
+
+      return a.columnLabel.localeCompare(b.columnLabel)
+    })
+  }, [columns])
+
+  const totals = useMemo(() => {
+    const columnTotals = {}
+
+    sortedColumns.forEach((column) => {
+      columnTotals[column.columnKey] = 0
+    })
+
+    rows.forEach((row) => {
+      sortedColumns.forEach((column) => {
+        columnTotals[column.columnKey] += Number(
+          row.values?.[column.columnKey] || 0
+        )
+      })
+    })
+
+    const movementInTotal = sortedColumns
+      .filter(
+        (column) =>
+          column.columnType === 'MOVEMENT' &&
+          column.movementDirection === 'IN' &&
+          column.includeInMaterialBalance === 'Yes' &&
+          column.isInternalTransfer !== 'Yes'
+      )
+      .reduce((sum, column) => sum + Number(columnTotals[column.columnKey] || 0), 0)
+
+    const movementOutTotal = sortedColumns
+      .filter(
+        (column) =>
+          column.columnType === 'MOVEMENT' &&
+          column.movementDirection === 'OUT' &&
+          column.includeInMaterialBalance === 'Yes' &&
+          column.isInternalTransfer !== 'Yes'
+      )
+      .reduce((sum, column) => sum + Number(columnTotals[column.columnKey] || 0), 0)
+
+    const closingColumn = sortedColumns.find(
+      (column) => column.columnType === 'ACTUAL_CLOSING'
     )
-  }, [rows])
+
+    const lossGainColumn = sortedColumns.find(
+      (column) => column.columnType === 'LOSS_GAIN'
+    )
+
+    const finalClosing = closingColumn
+      ? rows.length > 0
+        ? Number(rows[rows.length - 1]?.values?.[closingColumn.columnKey] || 0)
+        : 0
+      : 0
+
+    const lossGainTotal = lossGainColumn
+      ? Number(columnTotals[lossGainColumn.columnKey] || 0)
+      : 0
+
+    return {
+      columnTotals,
+      movementInTotal,
+      movementOutTotal,
+      finalClosing,
+      lossGainTotal,
+      closingColumnLabel: closingColumn?.columnLabel || 'Closing Stock',
+      lossGainColumnLabel: lossGainColumn?.columnLabel || 'Loss / Gain',
+    }
+  }, [rows, sortedColumns])
 
   const loadReport = async (activeFilters = filters) => {
+    if (!activeFilters.locationCode) {
+      alert('Location is required')
+      return
+    }
+
     if (!activeFilters.dateFrom || !activeFilters.dateTo) {
       alert('Date From and Date To are required')
       return
@@ -79,8 +123,12 @@ function MaterialBalanceReport({ locations, assets }) {
 
     try {
       setLoading(true)
+
       const data = await getMaterialBalanceReport(activeFilters)
-      setRows(data)
+
+      setTemplate(data.template)
+      setColumns(data.columns)
+      setRows(data.rows)
     } catch (error) {
       alert(error.message)
     } finally {
@@ -97,6 +145,9 @@ function MaterialBalanceReport({ locations, assets }) {
         locationCode: value,
         tankAssetCode: '',
       })
+      setTemplate(null)
+      setColumns([])
+      setRows([])
       return
     }
 
@@ -113,6 +164,8 @@ function MaterialBalanceReport({ locations, assets }) {
 
   const handleClearFilters = () => {
     setFilters(emptyFilters)
+    setTemplate(null)
+    setColumns([])
     setRows([])
   }
 
@@ -133,6 +186,22 @@ function MaterialBalanceReport({ locations, assets }) {
     }
 
     return ''
+  }
+
+  const getUnitLabel = () => {
+    if (filters.unit === 'gsv') {
+      return 'GSV'
+    }
+
+    if (filters.unit === 'lt') {
+      return 'LT'
+    }
+
+    if (filters.unit === 'mt') {
+      return 'MT'
+    }
+
+    return 'NSV'
   }
 
   const escapeCsvValue = (value) => {
@@ -185,20 +254,7 @@ function MaterialBalanceReport({ locations, assets }) {
       'Tank Asset Code',
       'Tank Asset Name',
       'Product',
-      'Opening NSV',
-      'Receipt NSV',
-      'Production NSV',
-      'Dispatch NSV',
-      'Draining NSV',
-      'Other In NSV',
-      'Other Out NSV',
-      'Total In NSV',
-      'Total Out NSV',
-      'Book Closing NSV',
-      'Actual Closing NSV',
-      'Loss Gain NSV',
-      'Closing LT',
-      'Closing MT',
+      ...sortedColumns.map((column) => `${column.columnLabel} ${getUnitLabel()}`),
       'Rows Count',
       'Last Ticket',
     ]
@@ -209,23 +265,12 @@ function MaterialBalanceReport({ locations, assets }) {
       row.accountingDate,
       row.locationCode,
       row.locationName,
-      row.tankAssetCode,
-      row.tankAssetName,
+      row.tankAssetCode || '',
+      row.tankAssetName || '',
       row.productName || '',
-      formatNumber(row.openingNsvBbl),
-      formatNumber(row.receiptNsvBbl),
-      formatNumber(row.productionNsvBbl),
-      formatNumber(row.dispatchNsvBbl),
-      formatNumber(row.drainingNsvBbl),
-      formatNumber(row.otherInNsvBbl),
-      formatNumber(row.otherOutNsvBbl),
-      formatNumber(row.totalInNsvBbl),
-      formatNumber(row.totalOutNsvBbl),
-      formatNumber(row.bookClosingNsvBbl),
-      formatNumber(row.actualClosingNsvBbl),
-      formatNumber(row.lossGainNsvBbl),
-      formatNumber(row.actualClosingLt),
-      formatNumber(row.actualClosingMt),
+      ...sortedColumns.map((column) =>
+        formatNumber(row.values?.[column.columnKey] || 0)
+      ),
       row.rowsCount,
       row.lastTicketNumber || '',
     ])
@@ -250,74 +295,66 @@ function MaterialBalanceReport({ locations, assets }) {
       return
     }
 
-    const reportRows = rows.map((row) => ({
-      'Accounting Date': row.accountingDate,
-      'Location Code': row.locationCode,
-      'Location Name': row.locationName,
-      'Tank Asset Code': row.tankAssetCode,
-      'Tank Asset Name': row.tankAssetName,
-      Product: row.productName || '',
-      'Opening NSV': Number(row.openingNsvBbl || 0),
-      'Receipt NSV': Number(row.receiptNsvBbl || 0),
-      'Production NSV': Number(row.productionNsvBbl || 0),
-      'Dispatch NSV': Number(row.dispatchNsvBbl || 0),
-      'Draining NSV': Number(row.drainingNsvBbl || 0),
-      'Other In NSV': Number(row.otherInNsvBbl || 0),
-      'Other Out NSV': Number(row.otherOutNsvBbl || 0),
-      'Total In NSV': Number(row.totalInNsvBbl || 0),
-      'Total Out NSV': Number(row.totalOutNsvBbl || 0),
-      'Book Closing NSV': Number(row.bookClosingNsvBbl || 0),
-      'Actual Closing NSV': Number(row.actualClosingNsvBbl || 0),
-      'Loss Gain NSV': Number(row.lossGainNsvBbl || 0),
-      'Closing LT': Number(row.actualClosingLt || 0),
-      'Closing MT': Number(row.actualClosingMt || 0),
-      'Rows Count': Number(row.rowsCount || 0),
-      'Last Ticket': row.lastTicketNumber || '',
-    }))
+    const reportRows = rows.map((row) => {
+      const exportRow = {
+        'Accounting Date': row.accountingDate,
+        'Location Code': row.locationCode,
+        'Location Name': row.locationName,
+        'Tank Asset Code': row.tankAssetCode || '',
+        'Tank Asset Name': row.tankAssetName || '',
+        Product: row.productName || '',
+      }
+
+      sortedColumns.forEach((column) => {
+        exportRow[`${column.columnLabel} ${getUnitLabel()}`] = Number(
+          row.values?.[column.columnKey] || 0
+        )
+      })
+
+      exportRow['Rows Count'] = Number(row.rowsCount || 0)
+      exportRow['Last Ticket'] = row.lastTicketNumber || ''
+
+      return exportRow
+    })
 
     const summaryRows = [
       {
-        Particular: 'Opening NSV',
-        Value: Number(totals.openingNsvBbl || 0),
+        Particular: `Total IN ${getUnitLabel()}`,
+        Value: Number(totals.movementInTotal || 0),
       },
       {
-        Particular: 'Receipt NSV',
-        Value: Number(totals.receiptNsvBbl || 0),
+        Particular: `Total OUT ${getUnitLabel()}`,
+        Value: Number(totals.movementOutTotal || 0),
       },
       {
-        Particular: 'Production NSV',
-        Value: Number(totals.productionNsvBbl || 0),
+        Particular: `${totals.closingColumnLabel} ${getUnitLabel()}`,
+        Value: Number(totals.finalClosing || 0),
       },
       {
-        Particular: 'Dispatch NSV',
-        Value: Number(totals.dispatchNsvBbl || 0),
-      },
-      {
-        Particular: 'Draining NSV',
-        Value: Number(totals.drainingNsvBbl || 0),
-      },
-      {
-        Particular: 'Total In NSV',
-        Value: Number(totals.totalInNsvBbl || 0),
-      },
-      {
-        Particular: 'Total Out NSV',
-        Value: Number(totals.totalOutNsvBbl || 0),
-      },
-      {
-        Particular: 'Final Closing NSV',
-        Value: Number(totals.finalClosingNsvBbl || 0),
-      },
-      {
-        Particular: 'Loss / Gain NSV',
-        Value: Number(totals.lossGainNsvBbl || 0),
+        Particular: `${totals.lossGainColumnLabel} ${getUnitLabel()}`,
+        Value: Number(totals.lossGainTotal || 0),
       },
     ]
 
+    const templateColumnRows = sortedColumns.map((column) => ({
+      'Column Order': column.columnOrder,
+      'Column Key': column.columnKey,
+      'Column Label': column.columnLabel,
+      'Column Type': column.columnType,
+      Direction: column.movementDirection || '',
+      'Include in Material Balance': column.includeInMaterialBalance,
+      'Include in Book Closing': column.includeInBookClosing,
+      'Internal Transfer': column.isInternalTransfer,
+    }))
+
     const filterRows = [
       {
+        Filter: 'Template',
+        Value: template?.templateName || '',
+      },
+      {
         Filter: 'Location',
-        Value: filters.locationCode || 'All Locations',
+        Value: filters.locationCode || '',
       },
       {
         Filter: 'Tank Asset',
@@ -326,6 +363,10 @@ function MaterialBalanceReport({ locations, assets }) {
       {
         Filter: 'Product',
         Value: filters.productName || 'All Products',
+      },
+      {
+        Filter: 'Unit',
+        Value: getUnitLabel(),
       },
       {
         Filter: 'Accounting Date From',
@@ -353,6 +394,12 @@ function MaterialBalanceReport({ locations, assets }) {
 
     XLSX.utils.book_append_sheet(
       workbook,
+      XLSX.utils.json_to_sheet(templateColumnRows),
+      'Template Columns'
+    )
+
+    XLSX.utils.book_append_sheet(
+      workbook,
       XLSX.utils.json_to_sheet(filterRows),
       'Filters'
     )
@@ -375,7 +422,8 @@ function MaterialBalanceReport({ locations, assets }) {
         <div>
           <h2>Material Balance Report</h2>
           <p>
-            Date-wise material balance from approved Tank Stock Ledger rows.
+            Dynamic date-wise material balance from user-configured template
+            columns.
           </p>
         </div>
 
@@ -391,7 +439,7 @@ function MaterialBalanceReport({ locations, assets }) {
             onChange={handleFilterChange}
             disabled={loading}
           >
-            <option value="">All Locations</option>
+            <option value="">Select Location</option>
 
             {activeLocations.map((location) => (
               <option key={location.id} value={location.locationCode}>
@@ -429,6 +477,21 @@ function MaterialBalanceReport({ locations, assets }) {
             placeholder="Example: Crude Oil"
             disabled={loading}
           />
+        </div>
+
+        <div>
+          <label>Unit</label>
+          <select
+            name="unit"
+            value={filters.unit}
+            onChange={handleFilterChange}
+            disabled={loading}
+          >
+            <option value="nsv">NSV</option>
+            <option value="gsv">GSV</option>
+            <option value="lt">LT</option>
+            <option value="mt">MT</option>
+          </select>
         </div>
 
         <div>
@@ -484,32 +547,40 @@ function MaterialBalanceReport({ locations, assets }) {
         </div>
       </form>
 
+      {template && (
+        <div className="info-box">
+          Active Template: {template.templateName} ({template.locationCode}).
+          Columns shown below are loaded from Material Balance Template
+          Configuration.
+        </div>
+      )}
+
       <div className="summary-card-grid">
         <div className="summary-card">
-          <span>Receipt NSV</span>
-          <strong>{formatNumber(totals.receiptNsvBbl)}</strong>
+          <span>Total IN {getUnitLabel()}</span>
+          <strong>{formatNumber(totals.movementInTotal)}</strong>
         </div>
 
         <div className="summary-card">
-          <span>Production NSV</span>
-          <strong>{formatNumber(totals.productionNsvBbl)}</strong>
+          <span>Total OUT {getUnitLabel()}</span>
+          <strong>{formatNumber(totals.movementOutTotal)}</strong>
         </div>
 
         <div className="summary-card">
-          <span>Dispatch NSV</span>
-          <strong>{formatNumber(totals.dispatchNsvBbl)}</strong>
+          <span>{totals.closingColumnLabel}</span>
+          <strong>{formatNumber(totals.finalClosing)}</strong>
         </div>
 
         <div className="summary-card">
-          <span>Final Closing NSV</span>
-          <strong>{formatNumber(totals.finalClosingNsvBbl)}</strong>
-        </div>
-
-        <div className="summary-card">
-          <span>Loss / Gain NSV</span>
-          <strong className={getNumberClass(totals.lossGainNsvBbl)}>
-            {formatNumber(totals.lossGainNsvBbl)}
+          <span>{totals.lossGainColumnLabel}</span>
+          <strong className={getNumberClass(totals.lossGainTotal)}>
+            {formatNumber(totals.lossGainTotal)}
           </strong>
+        </div>
+
+        <div className="summary-card">
+          <span>Unit</span>
+          <strong>{getUnitLabel()}</strong>
         </div>
       </div>
 
@@ -518,7 +589,11 @@ function MaterialBalanceReport({ locations, assets }) {
 
         <div className="print-report-meta">
           <span>
-            <strong>Location:</strong> {filters.locationCode || 'All Locations'}
+            <strong>Template:</strong> {template?.templateName || '-'}
+          </span>
+
+          <span>
+            <strong>Location:</strong> {filters.locationCode || '-'}
           </span>
 
           <span>
@@ -527,6 +602,10 @@ function MaterialBalanceReport({ locations, assets }) {
 
           <span>
             <strong>Product:</strong> {filters.productName || 'All Products'}
+          </span>
+
+          <span>
+            <strong>Unit:</strong> {getUnitLabel()}
           </span>
 
           <span>
@@ -541,28 +620,23 @@ function MaterialBalanceReport({ locations, assets }) {
 
         <div className="print-summary-grid">
           <div>
-            <span>Receipt NSV</span>
-            <strong>{formatNumber(totals.receiptNsvBbl)}</strong>
+            <span>Total IN {getUnitLabel()}</span>
+            <strong>{formatNumber(totals.movementInTotal)}</strong>
           </div>
 
           <div>
-            <span>Production NSV</span>
-            <strong>{formatNumber(totals.productionNsvBbl)}</strong>
+            <span>Total OUT {getUnitLabel()}</span>
+            <strong>{formatNumber(totals.movementOutTotal)}</strong>
           </div>
 
           <div>
-            <span>Dispatch NSV</span>
-            <strong>{formatNumber(totals.dispatchNsvBbl)}</strong>
+            <span>{totals.closingColumnLabel}</span>
+            <strong>{formatNumber(totals.finalClosing)}</strong>
           </div>
 
           <div>
-            <span>Closing NSV</span>
-            <strong>{formatNumber(totals.finalClosingNsvBbl)}</strong>
-          </div>
-
-          <div>
-            <span>Loss / Gain NSV</span>
-            <strong>{formatNumber(totals.lossGainNsvBbl)}</strong>
+            <span>{totals.lossGainColumnLabel}</span>
+            <strong>{formatNumber(totals.lossGainTotal)}</strong>
           </div>
         </div>
       </div>
@@ -570,8 +644,9 @@ function MaterialBalanceReport({ locations, assets }) {
       <div className="section-title">
         <h3>Material Balance Details</h3>
         <p>
-          Opening is previous closing, closing is latest approved tank stock of
-          the accounting day, and no-entry days carry forward previous closing.
+          Columns are generated from the active Material Balance Template.
+          Internal Transfer / ITT columns can be shown but excluded from Book
+          Closing based on configuration.
         </p>
       </div>
 
@@ -582,20 +657,14 @@ function MaterialBalanceReport({ locations, assets }) {
             <th>Location</th>
             <th>Tank</th>
             <th>Product</th>
-            <th>Opening NSV</th>
-            <th>Receipt NSV</th>
-            <th>Production NSV</th>
-            <th>Dispatch NSV</th>
-            <th>Draining NSV</th>
-            <th>Other In NSV</th>
-            <th>Other Out NSV</th>
-            <th>Total In NSV</th>
-            <th>Total Out NSV</th>
-            <th>Book Closing NSV</th>
-            <th>Actual Closing NSV</th>
-            <th>Loss / Gain NSV</th>
-            <th>Closing LT</th>
-            <th>Closing MT</th>
+
+            {sortedColumns.map((column) => (
+              <th key={column.columnKey}>
+                {column.columnLabel}
+                <div className="muted-table-text">{getUnitLabel()}</div>
+              </th>
+            ))}
+
             <th>Rows</th>
             <th>Last Ticket</th>
           </tr>
@@ -604,37 +673,45 @@ function MaterialBalanceReport({ locations, assets }) {
         <tbody>
           {rows.length === 0 ? (
             <tr>
-              <td colSpan="20" className="empty-table">
+              <td
+                colSpan={6 + sortedColumns.length}
+                className="empty-table"
+              >
                 No Material Balance rows found.
               </td>
             </tr>
           ) : (
             rows.map((row, index) => (
-              <tr key={`${row.accountingDate}-${row.tankAssetCode}-${index}`}>
+              <tr
+                key={`${row.accountingDate}-${row.tankAssetCode || 'ALL'}-${index}`}
+              >
                 <td>{row.accountingDate}</td>
                 <td>
                   {row.locationName} ({row.locationCode})
                 </td>
                 <td>
-                  {row.tankAssetName} ({row.tankAssetCode})
+                  {row.tankAssetName || 'All Tanks'}
+                  {row.tankAssetCode ? ` (${row.tankAssetCode})` : ''}
                 </td>
                 <td>{row.productName || '-'}</td>
-                <td>{formatNumber(row.openingNsvBbl)}</td>
-                <td>{formatNumber(row.receiptNsvBbl)}</td>
-                <td>{formatNumber(row.productionNsvBbl)}</td>
-                <td>{formatNumber(row.dispatchNsvBbl)}</td>
-                <td>{formatNumber(row.drainingNsvBbl)}</td>
-                <td>{formatNumber(row.otherInNsvBbl)}</td>
-                <td>{formatNumber(row.otherOutNsvBbl)}</td>
-                <td>{formatNumber(row.totalInNsvBbl)}</td>
-                <td>{formatNumber(row.totalOutNsvBbl)}</td>
-                <td>{formatNumber(row.bookClosingNsvBbl)}</td>
-                <td>{formatNumber(row.actualClosingNsvBbl)}</td>
-                <td className={getNumberClass(row.lossGainNsvBbl)}>
-                  {formatNumber(row.lossGainNsvBbl)}
-                </td>
-                <td>{formatNumber(row.actualClosingLt)}</td>
-                <td>{formatNumber(row.actualClosingMt)}</td>
+
+                {sortedColumns.map((column) => {
+                  const value = Number(row.values?.[column.columnKey] || 0)
+
+                  return (
+                    <td
+                      key={column.columnKey}
+                      className={
+                        column.columnType === 'LOSS_GAIN'
+                          ? getNumberClass(value)
+                          : ''
+                      }
+                    >
+                      {formatNumber(value)}
+                    </td>
+                  )
+                })}
+
                 <td>{row.rowsCount}</td>
                 <td>{row.lastTicketNumber || '-'}</td>
               </tr>
@@ -644,8 +721,8 @@ function MaterialBalanceReport({ locations, assets }) {
       </table>
 
       <div className="info-box">
-        Material Balance is calculated from approved Tank Stock Ledger rows. It
-        does not require users to create a daily Closing Stock ticket.
+        Material Balance is calculated from approved Tank Stock Ledger rows and
+        the active Material Balance Template for the selected location.
       </div>
     </div>
   )

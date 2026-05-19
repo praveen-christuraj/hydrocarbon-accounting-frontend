@@ -223,6 +223,12 @@ export const navigationItems = [
         permission: 'View Location Accounting Day Setting',
       },
       {
+        label: 'Material Balance Template',
+        path: '/material-balance-template-master',
+        disabled: false,
+        permission: 'View Material Balance Template',
+      },
+      {
         label: 'Audit Logs',
         path: '/audit-logs',
         requiredPermission: 'View Audit Log',

@@ -32,6 +32,7 @@ import OperationTransactionRegister from './pages/OperationTransactionRegister'
 import TankStockLedger from './pages/TankStockLedger'
 import OutTurnReport from './pages/OutTurnReport'
 import MaterialBalanceReport from './pages/MaterialBalanceReport'
+import MaterialBalanceTemplateMaster from './pages/MaterialBalanceTemplateMaster'
 import OperationTransactionDetail from './pages/OperationTransactionDetail'
 import LoginPage from './pages/LoginPage'
 import PermissionGuard from './components/PermissionGuard'
@@ -453,6 +454,19 @@ function AppContent({
                   locations={locations}
                   loggedInUser={loggedInUser}
                 />
+              </PermissionGuard>
+            }
+          />
+
+          <Route
+            path="/material-balance-template-master"
+            element={
+              <PermissionGuard
+                loggedInUser={loggedInUser}
+                requiredPermission="View Material Balance Template"
+                fallbackMessage="You do not have permission to view Material Balance Template Configuration."
+              >
+                <MaterialBalanceTemplateMaster locations={locations} />
               </PermissionGuard>
             }
           />

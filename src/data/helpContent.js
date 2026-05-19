@@ -270,6 +270,22 @@ export const helpContent = {
     ],
   },
 
+  '/material-balance-template-master': {
+    title: 'Material Balance Template Help',
+    description:
+      'Material Balance Template allows users to configure location-wise Material Balance columns from Tank Operations without hardcoding location-specific report layouts.',
+    points: [
+      'Create one active template per location for daily Material Balance reporting.',
+      'OPENING columns use configured SET operations like Opening Stock.',
+      'MOVEMENT columns must be mapped to Tank Operation codes.',
+      'IN movement columns can represent Receipt, Production, Receipt from X/Y, or similar terms configured by the user.',
+      'OUT movement columns can represent Dispatch, Dispatch to X/Y, Draining, or similar terms configured by the user.',
+      'Internal Tank Transfer / ITT columns should be marked as internal transfer so they are excluded from Material Balance and Book Closing.',
+      'Book Closing, Actual Closing, and Loss/Gain columns are calculated by the report engine.',
+      'This configuration removes hardcoded location-specific Material Balance columns.',
+    ],
+  },
+
   '/material-balance-report': {
     title: 'Material Balance Report Help',
     description:
