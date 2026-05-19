@@ -1,0 +1,56 @@
+
+# 2026-05-17 21:54:25.660576
++n
+
+# 2026-05-17 21:54:57.916536
++No
+
+# 2026-05-17 21:55:09.234810
++Modify only src/pages/OutTurnReport.jsx.
++
++Task:
++Add a CSV export feature for the currently displayed Out-Turn Report rows.
++
++Rules:
++- Do not modify any other file.
++- Do not refactor unrelated code.
++- Do not change API calls.
++- Do not change existing filters, summary cards, or table logic.
++- Add helper functions inside OutTurnReport component:
++  1. escapeCsvValue(value)
++  2. downloadCsv(filename, headers, dataRows)
++  3. handleExportCsv()
++- The CSV should export the currently displayed rows state, not refetch data.
++- Add an "Export CSV" button near the Apply/Clear filter buttons or just below the filter form.
++- If rows.length === 0, show alert("No OTR rows available to export").
++- CSV filename should be out-turn-report.csv.
++- CSV columns should be:
++  Accounting Date
++  Operation Date/Time
++  Ticket Number
++  Operation Number
++  Location Code
++  Location Name
++  Tank Asset Code
++  Tank Asset Name
++  Product
++  Operation Label
++  Operation Category
++  Operation Sign
++  Previous NSV
++  Stock After NSV
++  Net Receipt NSV
++  Net Dispatch NSV
++  Signed Net NSV
++  Stock After LT
++  Stock After MT
++  Status
++- Use existing row field names already present in the component.
++- Do not add any external library.
++- After editing, show the diff.
+
+# 2026-05-17 21:59:55.571427
++Nnnnnnnnn
+
+# 2026-05-17 21:59:59.468482
++no

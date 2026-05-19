@@ -149,6 +149,103 @@ function OutTurnReport({ locations, assets }) {
     return ''
   }
 
+  const escapeCsvValue = (value) => {
+    if (value === null || value === undefined) {
+      return ''
+    }
+
+    const text = String(value)
+
+    if (
+      text.includes(',') ||
+      text.includes('"') ||
+      text.includes('\n') ||
+      text.includes('\r')
+    ) {
+      return `"${text.replace(/"/g, '""')}"`
+    }
+
+    return text
+  }
+
+  const downloadCsv = (filename, headers, dataRows) => {
+    const csvLines = [
+      headers.map(escapeCsvValue).join(','),
+      ...dataRows.map((row) => row.map(escapeCsvValue).join(',')),
+    ]
+
+    const csvContent = csvLines.join('\n')
+    const blob = new Blob([csvContent], {
+      type: 'text/csv;charset=utf-8;',
+    })
+
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+
+    link.href = url
+    link.setAttribute('download', filename)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+
+    URL.revokeObjectURL(url)
+  }
+
+  const handleExportCsv = () => {
+    if (rows.length === 0) {
+      alert('No OTR rows available to export')
+      return
+    }
+
+    const headers = [
+      'Accounting Date',
+      'Operation Date/Time',
+      'Ticket Number',
+      'Operation Number',
+      'Location Code',
+      'Location Name',
+      'Tank Asset Code',
+      'Tank Asset Name',
+      'Product',
+      'Operation Label',
+      'Operation Category',
+      'Operation Sign',
+      'Previous NSV',
+      'Stock After NSV',
+      'Net Receipt NSV',
+      'Net Dispatch NSV',
+      'Signed Net NSV',
+      'Stock After LT',
+      'Stock After MT',
+      'Status',
+    ]
+
+    const dataRows = rows.map((row) => [
+      row.accountingDate,
+      formatDateTime(row.operationDatetime),
+      row.ticketNumber,
+      row.operationNumber,
+      row.locationCode,
+      row.locationName,
+      row.tankAssetCode,
+      row.tankAssetName,
+      row.productName || '',
+      row.tankOperationLabel,
+      row.tankOperationCategory,
+      row.tankOperationSign,
+      formatNumber(row.previousStockNsvBbl),
+      formatNumber(row.stockAfterNsvBbl),
+      formatNumber(row.netReceiptNsvBbl),
+      formatNumber(row.netDispatchNsvBbl),
+      formatNumber(row.signedNetMovementNsvBbl),
+      formatNumber(row.stockAfterLt),
+      formatNumber(row.stockAfterMt),
+      row.status,
+    ])
+
+    downloadCsv('out-turn-report.csv', headers, dataRows)
+  }
+
   return (
     <div>
       <div className="page-title">
@@ -260,8 +357,13 @@ function OutTurnReport({ locations, assets }) {
             Clear
           </button>
         </div>
-      </form>
 
+        <div className="filter-actions">
+          <button type="button" onClick={handleExportCsv} disabled={loading}>
+            Export CSV
+          </button>
+        </div>
+      </form>
       <div className="summary-card-grid">
         <div className="summary-card">
           <span>Total Receipt NSV</span>

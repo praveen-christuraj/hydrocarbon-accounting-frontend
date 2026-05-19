@@ -199,6 +199,201 @@ function TankStockLedger({ locations, assets }) {
     return formatNumber(row.movementNsvBbl)
   }
 
+  const escapeCsvValue = (value) => {
+    if (value === null || value === undefined) {
+      return ''
+    }
+
+    const text = String(value)
+
+    if (
+      text.includes(',') ||
+      text.includes('"') ||
+      text.includes('\n') ||
+      text.includes('\r')
+    ) {
+      return `"${text.replace(/"/g, '""')}"`
+    }
+
+    return text
+  }
+
+  const downloadCsv = (filename, headers, dataRows) => {
+    const csvLines = [
+      headers.map(escapeCsvValue).join(','),
+      ...dataRows.map((row) => row.map(escapeCsvValue).join(',')),
+    ]
+
+    const csvContent = csvLines.join('\n')
+    const blob = new Blob([csvContent], {
+      type: 'text/csv;charset=utf-8;',
+    })
+
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+
+    link.href = url
+    link.setAttribute('download', filename)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+
+    URL.revokeObjectURL(url)
+  }
+
+  const handleExportDailySummaryCsv = () => {
+    if (dailySummaryRows.length === 0) {
+      alert('No Daily Summary rows available to export')
+      return
+    }
+
+    const headers = [
+      'Accounting Date',
+      'Location Code',
+      'Location Name',
+      'Tank Asset Code',
+      'Tank Asset Name',
+      'Product',
+      'Opening NSV',
+      'Total In NSV',
+      'Total Out NSV',
+      'Book Closing NSV',
+      'Actual Closing NSV',
+      'Loss Gain NSV',
+      'Closing LT',
+      'Closing MT',
+      'Rows Count',
+      'Last Ticket',
+    ]
+
+    const dataRows = dailySummaryRows.map((row) => [
+      row.accountingDate,
+      row.locationCode,
+      row.locationName,
+      row.tankAssetCode,
+      row.tankAssetName,
+      row.productName || '',
+      formatNumber(row.openingNsvBbl),
+      formatNumber(row.totalInNsvBbl),
+      formatNumber(row.totalOutNsvBbl),
+      formatNumber(row.bookClosingNsvBbl),
+      formatNumber(row.actualClosingNsvBbl),
+      formatNumber(row.lossGainNsvBbl),
+      formatNumber(row.actualClosingLt),
+      formatNumber(row.actualClosingMt),
+      row.rowsCount,
+      row.lastTicketNumber || '',
+    ])
+
+    downloadCsv('tank-stock-ledger-daily-summary.csv', headers, dataRows)
+  }
+
+  const handleExportStockSummaryCsv = () => {
+    if (summaryRows.length === 0) {
+      alert('No Stock Summary rows available to export')
+      return
+    }
+
+    const headers = [
+      'Location Code',
+      'Location Name',
+      'Tank Asset Code',
+      'Tank Asset Name',
+      'Product',
+      'Opening NSV',
+      'Total In NSV',
+      'Total Out NSV',
+      'Closing NSV',
+      'Closing LT',
+      'Closing MT',
+    ]
+
+    const dataRows = summaryRows.map((row) => [
+      row.locationCode,
+      row.locationName,
+      row.tankAssetCode,
+      row.tankAssetName,
+      row.productName || '',
+      formatNumber(row.openingNsvBbl),
+      formatNumber(row.totalInNsvBbl),
+      formatNumber(row.totalOutNsvBbl),
+      formatNumber(row.closingNsvBbl),
+      formatNumber(row.closingLt),
+      formatNumber(row.closingMt),
+    ])
+
+    downloadCsv('tank-stock-ledger-stock-summary.csv', headers, dataRows)
+  }
+
+  const handleExportLedgerDetailsCsv = () => {
+    if (ledgerRows.length === 0) {
+      alert('No Ledger Detail rows available to export')
+      return
+    }
+
+    const headers = [
+      'Accounting Date',
+      'Operation Date',
+      'Ticket Number',
+      'Operation Number',
+      'Location Code',
+      'Location Name',
+      'Tank Asset Code',
+      'Tank Asset Name',
+      'Product',
+      'Operation Label',
+      'Operation Category',
+      'Operation Sign',
+      'Movement NSV',
+      'Running Balance NSV',
+      'Movement LT',
+      'Running Balance LT',
+      'Movement MT',
+      'Running Balance MT',
+      'Status',
+    ]
+
+    const dataRows = ledgerRows.map((row) => [
+      row.accountingDate || '',
+      row.operationDate,
+      row.ticketNumber,
+      row.operationNumber,
+      row.locationCode,
+      row.locationName,
+      row.tankAssetCode,
+      row.tankAssetName,
+      row.productName || '',
+      row.tankOperationLabel,
+      row.tankOperationCategory,
+      row.tankOperationSign,
+      formatNumber(row.movementNsvBbl),
+      formatNumber(row.runningBalanceNsvBbl),
+      formatNumber(row.movementLt),
+      formatNumber(row.runningBalanceLt),
+      formatNumber(row.movementMt),
+      formatNumber(row.runningBalanceMt),
+      row.status,
+    ])
+
+    downloadCsv('tank-stock-ledger-details.csv', headers, dataRows)
+  }
+
+  const handleExportCurrentViewCsv = () => {
+    if (activeView === 'daily-summary') {
+      handleExportDailySummaryCsv()
+      return
+    }
+
+    if (activeView === 'stock-summary') {
+      handleExportStockSummaryCsv()
+      return
+    }
+
+    if (activeView === 'ledger-details') {
+      handleExportLedgerDetailsCsv()
+    }
+  }
+
   return (
     <div>
       <div className="page-title">
@@ -370,6 +565,15 @@ function TankStockLedger({ locations, assets }) {
           onClick={() => setActiveView('ledger-details')}
         >
           Ledger Details
+        </button>
+
+        <button
+          type="button"
+          className="export-view-button"
+          onClick={handleExportCurrentViewCsv}
+          disabled={loading}
+        >
+          Export Current View CSV
         </button>
       </div>
 

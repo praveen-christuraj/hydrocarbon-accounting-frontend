@@ -2092,6 +2092,20 @@ textarea:focus {
   font-weight: 700;
 }
 
+.export-view-button {
+  background: #059669;
+  color: white;
+}
+
+.export-view-button:hover {
+  background: #047857;
+}
+
+.export-view-button:disabled {
+  background: #94a3b8;
+  cursor: not-allowed;
+}
+
 @media (max-width: 900px) {
   .summary-card-grid {
     grid-template-columns: repeat(2, minmax(160px, 1fr));
