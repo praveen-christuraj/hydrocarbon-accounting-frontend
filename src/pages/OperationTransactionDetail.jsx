@@ -7,6 +7,7 @@ import {
 } from '../api/operationTransactionApi'
 
 import { getCompanyReportProfiles } from '../api/companyReportProfileApi'
+import TankerPayloadPreview from '../components/operationLayouts/TankerPayloadPreview'
 
 const SELECTED_REPORT_PROFILE_KEY = 'tank_gauging_selected_report_profile'
 
@@ -1474,6 +1475,10 @@ function OperationTransactionDetail({ loggedInUser }) {
     return getMultiTankPayloadFromTransaction(transaction)
   }, [transaction])
 
+  const hasTankerPayload = (transaction?.fieldValues || []).some((value) => {
+    return value.fieldCode === 'tanker_payload'
+  })
+
   const hasPrintablePayload = Boolean(tankPayload || multiTankPayload)
   
   const loadTransactionDetail = async () => {
@@ -1710,6 +1715,28 @@ function OperationTransactionDetail({ loggedInUser }) {
 
   const confirmStatusChange = async () => {
     if (!pendingStatus) {
+      return
+    }
+
+    const hasTankerPayload = (transaction?.fieldValues || []).some((value) => {
+      return value.fieldCode === 'tanker_payload' && value.fieldValue
+    })
+
+    const isTankerTicket =
+      String(transaction?.entryLayoutType || '')
+        .toLowerCase()
+        .includes('tanker') ||
+      String(transaction?.calculationEngine || '')
+        .toLowerCase()
+        .includes('tanker') ||
+      (transaction?.fieldValues || []).some((value) => {
+        return value.fieldCode === 'tanker_payload'
+      })
+
+    if (pendingStatus === 'Approved' && isTankerTicket && !hasTankerPayload) {
+      alert(
+        'Cannot approve this tanker ticket because tanker_payload is missing. Please return it to Draft and complete the tanker entry.'
+      )
       return
     }
 
@@ -2156,6 +2183,14 @@ function OperationTransactionDetail({ loggedInUser }) {
         <div className="info-box">
           No asset-specific payload found. Review the saved template field values below before taking action.
         </div>
+      )}
+
+      {hasTankerPayload && (
+        <TankerPayloadPreview
+          entry={transaction}
+          values={transaction.fieldValues}
+          title="Tanker Approval Preview"
+        />
       )}
 
       <div className="section-title">

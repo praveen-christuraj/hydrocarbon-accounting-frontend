@@ -10,7 +10,11 @@ import {
 import TankGaugingLayout from '../components/operationLayouts/TankGaugingLayout'
 import MultiTankBeforeAfterLayout from '../components/operationLayouts/MultiTankBeforeAfterLayout'
 import TankerTruckLayout from '../components/operationLayouts/TankerTruckLayout'
-  
+import TankerPayloadPreview from '../components/operationLayouts/TankerPayloadPreview'
+import { getTankerSenderReference } from '../api/tankerTrackingApi'
+
+
+
 function LayoutSummaryPanel({ selectedTemplate }) {
   if (!selectedTemplate) {
     return null
@@ -163,6 +167,9 @@ function OperationLayoutRenderer({
   calibrationTemplates,
   handleValueChange,
   getInputType,
+  senderReference = null,
+  senderReferenceLoading = false,
+  receiverMode = false,
 }) {
   if (!selectedTemplate) {
     return (
@@ -344,6 +351,28 @@ function OperationLayoutRenderer({
       hasTankerPayloadField
 
     if (isTankerLayout) {
+      const isLockedForReview =
+        entry.status === 'Submitted' ||
+        entry.status === 'Approved' ||
+        entry.status === 'Cancelled'
+
+      if (isLockedForReview) {
+        return (
+          <>
+            <TankerPayloadPreview entry={entry} title="Tanker Ticket Preview" />
+
+            <OperationTemplateFields
+              entry={entry}
+              selectedTemplate={selectedTemplate}
+              selectedTemplateFields={selectedTemplateFields}
+              handleValueChange={handleValueChange}
+              getInputType={getInputType}
+              excludedFieldCodes={['tanker_payload']}
+            />
+          </>
+        )
+      }
+
       return (
         <>
           <TankerTruckLayout
@@ -354,6 +383,9 @@ function OperationLayoutRenderer({
             assetCalibrationTables={assetCalibrationTables}
             calibrationTemplates={calibrationTemplates}
             handleValueChange={handleValueChange}
+            senderReference={senderReference}
+            senderReferenceLoading={senderReferenceLoading}
+            receiverMode={receiverMode}
           />
 
           <OperationTemplateFields
@@ -450,6 +482,9 @@ function OperationEntry({
   const [entry, setEntry] = useState(emptyEntry)
   const [editId, setEditId] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [tankerSenderReference, setTankerSenderReference] = useState(null)
+  const [tankerSenderReferenceLoading, setTankerSenderReferenceLoading] =
+    useState(false)
 
   const location = useLocation()
   const navigate = useNavigate()
@@ -458,20 +493,53 @@ function OperationEntry({
   const prefill = useMemo(() => {
     const params = new URLSearchParams(location.search)
 
+    const mode = String(params.get('mode') || '').trim()
+    const source = String(params.get('source') || '').trim()
+
+    const senderTransactionIdRaw = String(
+      params.get('sender_transaction_id') || ''
+    ).trim()
+    const senderTransactionId = senderTransactionIdRaw
+      ? Number(senderTransactionIdRaw)
+      : null
+
     const convoyNumber = String(params.get('convoy_number') || '').trim()
     const primaryAssetCode = String(params.get('primary_asset_code') || '').trim()
     const originLocationCode = String(params.get('origin_location_code') || '').trim()
+    const destinationLocationCode = String(
+      params.get('destination_location_code') || ''
+    ).trim()
+    const senderLocationCode = String(
+      params.get('sender_location_code') || ''
+    ).trim()
+    const receiverLocationCode = String(
+      params.get('receiver_location_code') || ''
+    ).trim()
     const operationTypeCode = String(params.get('operation_type_code') || '').trim()
+    const operationTemplateId = String(
+      params.get('operation_template_id') || ''
+    ).trim()
+    const productName = String(params.get('product_name') || '').trim()
+    const remarks = String(params.get('remarks') || '').trim()
 
     const autoEventType = String(params.get('auto_event_type') || '').trim()
     const leftTicketIdRaw = String(params.get('left_ticket_id') || '').trim()
     const leftTicketId = leftTicketIdRaw ? Number(leftTicketIdRaw) : null
 
     return {
+      mode,
+      source,
+      senderTransactionId,
       convoyNumber,
       primaryAssetCode,
       originLocationCode,
+      destinationLocationCode,
+      senderLocationCode,
+      receiverLocationCode,
       operationTypeCode,
+      operationTemplateId,
+      productName,
+      remarks,
       autoEventType,
       leftTicketId,
     }
@@ -481,10 +549,19 @@ function OperationEntry({
     if (prefillApplied) return
 
     const hasAny =
+      prefill.mode ||
+      prefill.source ||
+      prefill.senderTransactionId ||
       prefill.convoyNumber ||
       prefill.primaryAssetCode ||
       prefill.originLocationCode ||
+      prefill.destinationLocationCode ||
+      prefill.senderLocationCode ||
+      prefill.receiverLocationCode ||
       prefill.operationTypeCode ||
+      prefill.operationTemplateId ||
+      prefill.productName ||
+      prefill.remarks ||
       prefill.autoEventType ||
       prefill.leftTicketId
 
@@ -494,12 +571,66 @@ function OperationEntry({
       ...current,
       convoyNumber: prefill.convoyNumber || current.convoyNumber,
       primaryAssetCode: prefill.primaryAssetCode || current.primaryAssetCode,
-      originLocationCode: prefill.originLocationCode || current.originLocationCode,
+      originLocationCode:
+        prefill.originLocationCode || current.originLocationCode,
+      destinationLocationCode:
+        prefill.destinationLocationCode || current.destinationLocationCode,
+      senderLocationCode:
+        prefill.senderLocationCode || current.senderLocationCode,
+      receiverLocationCode:
+        prefill.receiverLocationCode || current.receiverLocationCode,
       operationTypeCode: prefill.operationTypeCode || current.operationTypeCode,
+      operationTemplateId:
+        prefill.operationTemplateId || current.operationTemplateId,
+      productName: prefill.productName || current.productName,
+      remarks: prefill.remarks || current.remarks,
+      status: 'Draft',
     }))
 
     setPrefillApplied(true)
   }, [prefill, prefillApplied])
+
+  useEffect(() => {
+    const shouldLoadSenderReference =
+      prefill.mode === 'tanker-receiver' &&
+      prefill.senderTransactionId
+
+    if (!shouldLoadSenderReference) {
+      setTankerSenderReference(null)
+      return
+    }
+
+    let isCancelled = false
+
+    const loadSenderReference = async () => {
+      try {
+        setTankerSenderReferenceLoading(true)
+
+        const reference = await getTankerSenderReference(
+          prefill.senderTransactionId
+        )
+
+        if (!isCancelled) {
+          setTankerSenderReference(reference)
+        }
+      } catch (error) {
+        if (!isCancelled) {
+          setTankerSenderReference(null)
+          alert(error.message || 'Unable to load sender tanker reference')
+        }
+      } finally {
+        if (!isCancelled) {
+          setTankerSenderReferenceLoading(false)
+        }
+      }
+    }
+
+    loadSenderReference()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [prefill.mode, prefill.senderTransactionId])
 
   const activeOperationTypes = operationTypes.filter(
     (item) => item.status === 'Active'
@@ -581,6 +712,25 @@ function OperationEntry({
         sortOrder: field.sortOrder,
       }))
   }
+
+  useEffect(() => {
+    if (!prefillApplied) {
+      return
+    }
+
+    if (!prefill.operationTemplateId) {
+      return
+    }
+
+    if (entry.values && entry.values.length > 0) {
+      return
+    }
+
+    setEntry((current) => ({
+      ...current,
+      values: initializeValuesFromTemplate(prefill.operationTemplateId),
+    }))
+  }, [prefillApplied, prefill.operationTemplateId])
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -1083,6 +1233,20 @@ function OperationEntry({
       </div>
 
       <form onSubmit={handleSubmit}>
+        {prefill.mode === 'tanker-receiver' && (
+          <div className="info-box full-width-field">
+            <strong>Receiver Tanker Entry</strong>
+            <div>
+              This entry was created from Tanker Tracking against sender
+              transaction ID: {prefill.senderTransactionId || '-'}.
+            </div>
+            <div>
+              Convoy, product, asset and receiver location were prefilled from
+              the sender tracking record. Enter the receiver dips, sample
+              parameters and seals, then save as a new receiver ticket.
+            </div>
+          </div>
+        )}
         <div>
           <label>Operation Type</label>
           <select
@@ -1328,6 +1492,9 @@ function OperationEntry({
           calibrationTemplates={calibrationTemplates}
           handleValueChange={handleValueChange}
           getInputType={getInputType}
+          senderReference={tankerSenderReference}
+          senderReferenceLoading={tankerSenderReferenceLoading}
+          receiverMode={prefill.mode === 'tanker-receiver'}
         />
 
         <div className="form-actions">

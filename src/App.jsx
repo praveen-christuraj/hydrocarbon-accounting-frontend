@@ -43,6 +43,7 @@ import BargeSealMaster from './pages/BargeSealMaster'
 import ConvoyTracker from './pages/ConvoyTracker'
 import TankerTransactionReport from './pages/TankerTransactionReport'
 import PrimeMoverTankerLinkMaster from './pages/PrimeMoverTankerLinkMaster'
+import TankerTracking from './pages/TankerTracking'
 
 import { getCurrentUser, logoutUser } from './api/authApi'
 import { getLocationOperationAvailability } from './api/locationOperationAvailabilityApi'
@@ -757,7 +758,23 @@ function AppContent({
               </PermissionGuard>
             }
           />
-
+          <Route
+            path="/tanker-tracking"
+            element={
+              <PermissionGuard
+                loggedInUser={loggedInUser}
+                requiredPermission="View Operation Transaction"
+                fallbackMessage="You do not have permission to view Tanker Tracking."
+              >
+                <TankerTracking
+                  locations={locations}
+                  assets={assets}
+                  operationTypes={operationTypes}
+                  operationTemplates={operationTemplates}
+                />
+              </PermissionGuard>
+            }
+          />
           <Route
             path="/location-operation-availability"
             element={

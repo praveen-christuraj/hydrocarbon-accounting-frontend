@@ -263,6 +263,9 @@ function TankerTruckLayout({
   assetCalibrationTables = [],
   calibrationTemplates = [],
   handleValueChange,
+  senderReference = null,
+  senderReferenceLoading = false,
+  receiverMode = false,
 }) {
   const existingPayload = useMemo(() => {
     return getExistingTankerPayload(entry)
@@ -765,6 +768,25 @@ function TankerTruckLayout({
 
       inputs: finalInputs,
 
+      sender_reference:
+        receiverMode && senderReference
+          ? {
+              sender_transaction_id: senderReference.transactionId,
+              ticket_number: senderReference.ticketNumber,
+              operation_number: senderReference.operationNumber,
+              convoy_number: senderReference.convoyNumber,
+              tanker_asset_code: senderReference.tankerAssetCode,
+              prime_mover_asset_code: senderReference.primeMoverAssetCode,
+              sender_nsv_bbl: senderReference.nsvBbl,
+              sender_gsv_bbl: senderReference.gsvBbl,
+              sender_gov_bbl: senderReference.govBbl,
+              sender_seal_c1: senderReference.sealC1,
+              sender_seal_c2: senderReference.sealC2,
+              sender_seal_m1: senderReference.sealM1,
+              sender_seal_m2: senderReference.sealM2,
+            }
+          : null,
+
       calculated: finalCalculated || {
         tovBbl: null,
         freeWaterBbl: null,
@@ -794,6 +816,8 @@ function TankerTruckLayout({
     tankerInput,
     finalCalculated,
     validationResult,
+    receiverMode,
+    senderReference,
   ])
 
   const payloadJson = useMemo(() => {
@@ -824,6 +848,156 @@ function TankerTruckLayout({
     setTankerInput((current) => ({
       ...current,
       [name]: value,
+    }))
+  }
+
+  const copySenderSeals = () => {
+    if (!senderReference) {
+      return
+    }
+
+    setTankerInput((current) => ({
+      ...current,
+      sealC1: senderReference.sealC1 || current.sealC1,
+      sealC2: senderReference.sealC2 || current.sealC2,
+      sealM1: senderReference.sealM1 || current.sealM1,
+      sealM2: senderReference.sealM2 || current.sealM2,
+    }))
+  }
+
+  const copySenderQuality = () => {
+    if (!senderReference) {
+      return
+    }
+
+    setTankerInput((current) => ({
+      ...current,
+      bswPercent:
+        senderReference.bswPercent !== null &&
+        senderReference.bswPercent !== undefined
+          ? String(senderReference.bswPercent)
+          : current.bswPercent,
+      tankTemperatureUnit:
+        senderReference.tankTemperatureUnit || current.tankTemperatureUnit,
+      tankTemperature:
+        senderReference.tankTemperature !== null &&
+        senderReference.tankTemperature !== undefined
+          ? String(senderReference.tankTemperature)
+          : current.tankTemperature,
+      sampleTemperatureUnit:
+        senderReference.sampleTemperatureUnit ||
+        current.sampleTemperatureUnit,
+      sampleTemperature:
+        senderReference.sampleTemperature !== null &&
+        senderReference.sampleTemperature !== undefined
+          ? String(senderReference.sampleTemperature)
+          : current.sampleTemperature,
+      observedInputType:
+        senderReference.observedInputType || current.observedInputType,
+      observedApi:
+        senderReference.observedApi !== null &&
+        senderReference.observedApi !== undefined
+          ? String(senderReference.observedApi)
+          : current.observedApi,
+      observedDensity:
+        senderReference.observedDensity !== null &&
+        senderReference.observedDensity !== undefined
+          ? String(senderReference.observedDensity)
+          : current.observedDensity,
+    }))
+  }
+
+  const copySenderDips = () => {
+    if (!senderReference) {
+      return
+    }
+
+    const confirmed = window.confirm(
+      'Copy sender dips into receiver entry? Receiver dips are normally measured independently. Use this only when you intentionally want to start from sender values.'
+    )
+
+    if (!confirmed) {
+      return
+    }
+
+    setTankerInput((current) => ({
+      ...current,
+      compartment: senderReference.compartment || current.compartment,
+      totalDipCm:
+        senderReference.totalDipCm !== null &&
+        senderReference.totalDipCm !== undefined
+          ? String(senderReference.totalDipCm)
+          : current.totalDipCm,
+      waterDipCm:
+        senderReference.waterDipCm !== null &&
+        senderReference.waterDipCm !== undefined
+          ? String(senderReference.waterDipCm)
+          : current.waterDipCm,
+    }))
+  }
+
+  const copyAllSenderReference = () => {
+    if (!senderReference) {
+      return
+    }
+
+    const confirmed = window.confirm(
+      'Copy sender dips, quality and seals into receiver entry? You can edit all copied values before saving.'
+    )
+
+    if (!confirmed) {
+      return
+    }
+
+    setTankerInput((current) => ({
+      ...current,
+      compartment: senderReference.compartment || current.compartment,
+      totalDipCm:
+        senderReference.totalDipCm !== null &&
+        senderReference.totalDipCm !== undefined
+          ? String(senderReference.totalDipCm)
+          : current.totalDipCm,
+      waterDipCm:
+        senderReference.waterDipCm !== null &&
+        senderReference.waterDipCm !== undefined
+          ? String(senderReference.waterDipCm)
+          : current.waterDipCm,
+      bswPercent:
+        senderReference.bswPercent !== null &&
+        senderReference.bswPercent !== undefined
+          ? String(senderReference.bswPercent)
+          : current.bswPercent,
+      tankTemperatureUnit:
+        senderReference.tankTemperatureUnit || current.tankTemperatureUnit,
+      tankTemperature:
+        senderReference.tankTemperature !== null &&
+        senderReference.tankTemperature !== undefined
+          ? String(senderReference.tankTemperature)
+          : current.tankTemperature,
+      sampleTemperatureUnit:
+        senderReference.sampleTemperatureUnit ||
+        current.sampleTemperatureUnit,
+      sampleTemperature:
+        senderReference.sampleTemperature !== null &&
+        senderReference.sampleTemperature !== undefined
+          ? String(senderReference.sampleTemperature)
+          : current.sampleTemperature,
+      observedInputType:
+        senderReference.observedInputType || current.observedInputType,
+      observedApi:
+        senderReference.observedApi !== null &&
+        senderReference.observedApi !== undefined
+          ? String(senderReference.observedApi)
+          : current.observedApi,
+      observedDensity:
+        senderReference.observedDensity !== null &&
+        senderReference.observedDensity !== undefined
+          ? String(senderReference.observedDensity)
+          : current.observedDensity,
+      sealC1: senderReference.sealC1 || current.sealC1,
+      sealC2: senderReference.sealC2 || current.sealC2,
+      sealM1: senderReference.sealM1 || current.sealM1,
+      sealM2: senderReference.sealM2 || current.sealM2,
     }))
   }
 
@@ -1021,6 +1195,143 @@ function TankerTruckLayout({
           <div className="info-box">
             Upload an active calibration table against the linked Tanker Trailer
             asset. Do not upload tanker calibration against the Prime Mover.
+          </div>
+        )}
+
+        {receiverMode && (
+          <div className="tanker-sender-reference-panel">
+            <div className="tanker-sender-reference-header">
+              <div>
+                <h4>Sender Reference</h4>
+                <p>
+                  Receiver entry is linked to the approved sender tanker ticket.
+                  Copy buttons are only shortcuts; receiver can edit all values
+                  before saving.
+                </p>
+              </div>
+
+              {senderReferenceLoading && (
+                <span className="status-badge submitted">Loading...</span>
+              )}
+            </div>
+
+            {!senderReferenceLoading && !senderReference && (
+              <div className="info-box">
+                Sender reference could not be loaded. Receiver can still enter
+                values manually.
+              </div>
+            )}
+
+            {senderReference && (
+              <>
+                <div className="tanker-sender-reference-grid">
+                  <div>
+                    <span>Sender Ticket</span>
+                    <strong>
+                      {senderReference.ticketNumber ||
+                        senderReference.operationNumber ||
+                        '-'}
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>Convoy</span>
+                    <strong>{senderReference.convoyNumber || '-'}</strong>
+                  </div>
+
+                  <div>
+                    <span>Sender Operation</span>
+                    <strong>
+                      {senderReference.operationTypeName ||
+                        senderReference.operationTypeCode ||
+                        '-'}
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>Product</span>
+                    <strong>{senderReference.productName || '-'}</strong>
+                  </div>
+
+                  <div>
+                    <span>Sender TOV</span>
+                    <strong>
+                      {formatNumber(senderReference.tovBbl || 0, 3)} bbl
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>Sender GOV</span>
+                    <strong>
+                      {formatNumber(senderReference.govBbl || 0, 3)} bbl
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>Sender GSV</span>
+                    <strong>
+                      {formatNumber(senderReference.gsvBbl || 0, 3)} bbl
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>Sender NSV</span>
+                    <strong>
+                      {formatNumber(senderReference.nsvBbl || 0, 3)} bbl
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>Sender Dips</span>
+                    <strong>
+                      Total {formatNumber(senderReference.totalDipCm || 0, 1)}
+                      cm / Water{' '}
+                      {formatNumber(senderReference.waterDipCm || 0, 1)} cm
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>Sender Quality</span>
+                    <strong>
+                      BS&W {formatNumber(senderReference.bswPercent || 0, 2)}%
+                      / API60{' '}
+                      {senderReference.api60 !== null &&
+                      senderReference.api60 !== undefined
+                        ? formatNumber(senderReference.api60, 2)
+                        : '-'}
+                    </strong>
+                  </div>
+
+                  <div className="sender-reference-wide">
+                    <span>Sender Seals</span>
+                    <strong>
+                      C1: {senderReference.sealC1 || '-'} / C2:{' '}
+                      {senderReference.sealC2 || '-'} / M1:{' '}
+                      {senderReference.sealM1 || '-'} / M2:{' '}
+                      {senderReference.sealM2 || '-'}
+                    </strong>
+                  </div>
+                </div>
+
+                <div className="tanker-sender-copy-actions">
+                  <button type="button" onClick={copySenderSeals}>
+                    Copy Seals
+                  </button>
+
+                  <button type="button" onClick={copySenderQuality}>
+                    Copy Quality / Sample
+                  </button>
+
+                  <button type="button" onClick={copySenderDips}>
+                    Copy Dips
+                  </button>
+
+                  <button type="button" onClick={copyAllSenderReference}>
+                    Copy All
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         )}
 

@@ -147,6 +147,12 @@ export const navigationItems = [
         disabled: false,
       },
       {
+        label: 'Tanker Tracking',
+        path: '/tanker-tracking',
+        disabled: false,
+        permission: 'View Operation Transaction',
+      },
+      {
         label: 'Operation Transaction Register',
         path: '/operation-transactions',
         disabled: false,
