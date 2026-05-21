@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { apiPost } from '../api/apiClient'
-import { createTripEvent, createTripComparison } from '../api/convoyTrackerApi'
 import {
   createOperationEntry,
   deleteOperationEntry,
@@ -1087,35 +1086,16 @@ function OperationEntry({
         await reloadOperationTransactions()
       }
 
-      // ✅ Auto UNLOAD + Comparison only when triggered by Step 11C params
+      // ✅ Auto navigation back to Barge Tracking only (events/comparisons are created on APPROVAL in backend)
       if (saved && prefill.autoEventType) {
         const convoy = String(entry.convoyNumber || '').trim()
         if (!convoy) {
-          alert(`Auto-link skipped: Convoy Number is required for ${prefill.autoEventType}`)
+          alert(`Auto navigation skipped: Convoy Number is required for ${prefill.autoEventType}`)
           setLoading(false)
           return
         }
 
-        await createTripEvent({
-          convoyNumber: convoy,
-          eventType: prefill.autoEventType,
-          locationCode: entry.originLocationCode || null,
-          assetCode: entry.primaryAssetCode,
-          operationTransactionId: saved.id,
-          remarks: `Auto-linked ${prefill.autoEventType} from Acknowledge Receipt`,
-        })
-
-        if (prefill.leftTicketId) {
-          await createTripComparison({
-            convoyNumber: convoy,
-            comparisonType: 'LOAD_AFTER_vs_UNLOAD_BEFORE',
-            leftTransactionId: prefill.leftTicketId,
-            rightTransactionId: saved.id,
-            remarks: 'Auto-created from Acknowledge Receipt',
-          })
-        }
-
-        navigate(`/convoy-tracker?convoy_number=${encodeURIComponent(convoy)}`)
+        navigate(`/barge-tracking?convoy_number=${encodeURIComponent(convoy)}`)
         return
       }
 

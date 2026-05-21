@@ -157,6 +157,9 @@ const convertGroupFromApi = (group) => ({
   acknowledgedBy: group.acknowledged_by || '',
   acknowledgedAt: group.acknowledged_at || '',
   acknowledgementRemarks: group.acknowledgement_remarks || '',
+  closedBy: group.closed_by || '',
+  closedAt: group.closed_at || '',
+  closureRemarks: group.closure_remarks || '',
 
   trackingStatus: group.tracking_status || '',
   warningMessages: group.warning_messages || [],
@@ -237,4 +240,17 @@ export const getTankerSenderReference = async (senderTransactionId) => {
   )
 
   return convertTicketFromApi(data)
+}
+
+export const closeTankerMovement = async ({
+  acknowledgementId,
+  closureRemarks,
+}) => {
+  return apiPost('/tanker-tracking/close', {
+    acknowledgement_id: Number(acknowledgementId),
+    closure_remarks:
+      closureRemarks && String(closureRemarks).trim() !== ''
+        ? String(closureRemarks).trim()
+        : null,
+  })
 }

@@ -3788,3 +3788,297 @@ textarea:focus {
     margin: 5mm;
   }
 }
+.tanker-exception-dashboard {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(120px, 1fr));
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.exception-card {
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: 0.15s ease;
+  min-height: 72px;
+}
+
+.exception-card span {
+  display: block;
+  color: #64748b;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.exception-card strong {
+  display: block;
+  color: #0f172a;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.exception-card:hover,
+.exception-card.selected {
+  border-color: #2563eb;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.12);
+  transform: translateY(-1px);
+}
+
+.exception-card.pending {
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+
+.exception-card.acknowledged {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.exception-card.danger {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.exception-card.warning {
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+
+.exception-card.success {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.inline-action-btn {
+  width: auto;
+  margin-left: 10px;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+@media (max-width: 1100px) {
+  .tanker-exception-dashboard {
+    grid-template-columns: repeat(3, minmax(120px, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .tanker-exception-dashboard {
+    grid-template-columns: repeat(2, minmax(120px, 1fr));
+  }
+}
+.tanker-exception-dashboard {
+  grid-template-columns: repeat(7, minmax(110px, 1fr));
+}
+
+@media (max-width: 1250px) {
+  .tanker-exception-dashboard {
+    grid-template-columns: repeat(4, minmax(120px, 1fr));
+  }
+}
+
+@media (max-width: 800px) {
+  .tanker-exception-dashboard {
+    grid-template-columns: repeat(2, minmax(120px, 1fr));
+  }
+}
+/* Compact Barge MTR / Reconciliation Report */
+.barge-mtr-report {
+  background: #ffffff;
+  color: #111827;
+  font-family: Arial, sans-serif;
+  padding: 8px;
+  font-size: 9.5px;
+  line-height: 1.15;
+}
+
+.barge-mtr-header {
+  display: grid;
+  grid-template-columns: 1fr 210px;
+  gap: 8px;
+  border: 1.5px solid #111827;
+  padding: 6px 8px;
+  margin-bottom: 5px;
+}
+
+.barge-mtr-header h1 {
+  margin: 0;
+  font-size: 15px;
+  letter-spacing: 0.3px;
+}
+
+.barge-mtr-header p {
+  margin: 3px 0 0;
+  font-size: 10px;
+}
+
+.barge-mtr-meta {
+  display: grid;
+  grid-template-columns: 78px 1fr;
+  gap: 2px 5px;
+  font-size: 8.5px;
+}
+
+.barge-mtr-meta span,
+.barge-mtr-remarks-grid span {
+  color: #475569;
+  text-transform: uppercase;
+  font-size: 8px;
+}
+
+.barge-mtr-meta strong {
+  font-size: 8.8px;
+  line-height: 1.1;
+}
+
+.barge-mtr-two-column {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  align-items: start;
+}
+
+.barge-mtr-section {
+  margin-top: 5px;
+  page-break-inside: avoid;
+}
+
+.barge-mtr-section h2 {
+  margin: 0;
+  padding: 3px 5px;
+  background: #e5e7eb;
+  border: 1px solid #111827;
+  border-bottom: none;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.barge-mtr-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 8.8px;
+}
+
+.barge-mtr-table th,
+.barge-mtr-table td {
+  border: 1px solid #111827;
+  padding: 3px;
+  vertical-align: middle;
+  line-height: 1.1;
+  word-break: break-word;
+}
+
+.barge-mtr-table th {
+  background: #f3f4f6;
+  text-align: left;
+}
+
+.barge-mtr-number-table th:not(:first-child),
+.barge-mtr-number-table td:not(:first-child) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.barge-mtr-note {
+  margin: 3px 0 0;
+  font-size: 8px;
+}
+
+.barge-mtr-remarks-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr 1fr;
+  border-left: 1px solid #111827;
+  border-top: 1px solid #111827;
+}
+
+.barge-mtr-remarks-grid > div {
+  min-height: 28px;
+  padding: 4px;
+  border-right: 1px solid #111827;
+  border-bottom: 1px solid #111827;
+}
+
+.barge-mtr-remarks-grid strong {
+  display: block;
+  font-size: 8.8px;
+  margin-top: 2px;
+}
+
+.barge-mtr-signature-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 7px;
+}
+
+.barge-mtr-signature-grid > div {
+  min-height: 38px;
+  border: 1px solid #111827;
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.barge-mtr-signature-grid strong {
+  font-size: 9px;
+}
+
+.barge-mtr-signature-grid span {
+  font-size: 7.8px;
+  color: #475569;
+}
+
+.barge-mtr-footer {
+  margin-top: 5px;
+  font-size: 7.8px;
+  text-align: center;
+  color: #475569;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .printable-report,
+  .printable-report * {
+    visibility: visible;
+  }
+
+  .printable-report {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+
+  .no-print,
+  .no-print * {
+    display: none !important;
+  }
+
+  .barge-mtr-report {
+    padding: 4mm;
+    font-size: 8.8px;
+  }
+
+  .barge-mtr-section {
+    margin-top: 4px;
+  }
+
+  .barge-mtr-table th,
+  .barge-mtr-table td {
+    padding: 2.5px;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 5mm;
+  }
+}

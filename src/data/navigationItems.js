@@ -142,9 +142,10 @@ export const navigationItems = [
         permission: 'Create Operation Entry',
       },
       {
-        label: 'Convoy Tracker',
-        path: '/convoy-tracker',
+        label: 'Barge Tracking',
+        path: '/barge-tracking',
         disabled: false,
+        permission: 'View Operation Transaction',
       },
       {
         label: 'Tanker Tracking',

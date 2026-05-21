@@ -4,6 +4,7 @@ import {
   Routes,
   Route,
   Link,
+  Navigate,
   useLocation,
 } from 'react-router-dom'
 
@@ -40,7 +41,7 @@ import Table11FactorMaster from './pages/Table11FactorMaster'
 import CompanyReportProfileMaster from './pages/CompanyReportProfileMaster'
 import AuditLog from './pages/AuditLog'
 import BargeSealMaster from './pages/BargeSealMaster'
-import ConvoyTracker from './pages/ConvoyTracker'
+import BargeTracking from './pages/BargeTracking'
 import TankerTransactionReport from './pages/TankerTransactionReport'
 import PrimeMoverTankerLinkMaster from './pages/PrimeMoverTankerLinkMaster'
 import TankerTracking from './pages/TankerTracking'
@@ -743,20 +744,24 @@ function AppContent({
           />
 
           <Route
-            path="/convoy-tracker"
+            path="/barge-tracking"
             element={
               <PermissionGuard
                 loggedInUser={loggedInUser}
                 requiredPermission="View Operation Transaction"
-                fallbackMessage="You do not have permission to view convoy tracker."
+                fallbackMessage="You do not have permission to view Barge Tracking."
               >
-                <ConvoyTracker
+                <BargeTracking
                   loggedInUser={loggedInUser}
                   assets={assets}
                   locations={locations}
                 />
               </PermissionGuard>
             }
+          />
+          <Route
+            path="/convoy-tracker"
+            element={<Navigate to="/barge-tracking" replace />}
           />
           <Route
             path="/tanker-tracking"

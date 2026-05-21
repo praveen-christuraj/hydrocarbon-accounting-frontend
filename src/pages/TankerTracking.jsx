@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   acknowledgeTankerReceipt,
+  closeTankerMovement,
   getTankerTracking,
   revokeTankerAcknowledgement,
 } from '../api/tankerTrackingApi'
@@ -38,6 +39,7 @@ const statusLabelMap = {
   MATCHED: 'Matched',
   SEAL_MISMATCH: 'Seal Mismatch',
   QUANTITY_VARIANCE: 'Quantity Variance',
+  CLOSED: 'Closed',
   NO_SENDER: 'No Sender',
 }
 
@@ -62,6 +64,9 @@ const getTrackingStatusClass = (status) => {
     return 'rejected'
   }
 
+  if (status === 'CLOSED') {
+    return 'active'
+  }
   return 'submitted'
 }
 
@@ -112,6 +117,7 @@ function TankerTracking({
     sealMismatchGroups: 0,
     quantityVarianceGroups: 0,
   })
+  const [trackingStatusFilter, setTrackingStatusFilter] = useState('ALL')
   const [selectedGroup, setSelectedGroup] = useState(null)
   const [printGroup, setPrintGroup] = useState(null)
   const [ackGroup, setAckGroup] = useState(null)
@@ -122,6 +128,38 @@ function TankerTracking({
   const [revokeGroup, setRevokeGroup] = useState(null)
   const [revokeRemarks, setRevokeRemarks] = useState('')
   const [loading, setLoading] = useState(false)
+  const [closeGroup, setCloseGroup] = useState(null)
+  const [closureRemarks, setClosureRemarks] = useState('')
+  
+  const trackingExceptionSummary = useMemo(() => {
+    const rows = report.rows || []
+
+    return {
+      all: rows.length,
+      pendingReceipt: rows.filter((row) => row.trackingStatus === 'PENDING_RECEIPT')
+        .length,
+      acknowledged: rows.filter((row) => row.trackingStatus === 'ACKNOWLEDGED')
+        .length,
+      sealMismatch: rows.filter((row) => row.trackingStatus === 'SEAL_MISMATCH')
+        .length,
+      quantityVariance: rows.filter(
+        (row) => row.trackingStatus === 'QUANTITY_VARIANCE'
+      ).length,
+      matched: rows.filter((row) => row.trackingStatus === 'MATCHED').length,
+      closed: rows.filter((row) => row.trackingStatus === 'CLOSED').length,
+      noSender: rows.filter((row) => row.trackingStatus === 'NO_SENDER').length,
+    }
+  }, [report.rows])
+
+  const filteredTrackingRows = useMemo(() => {
+    if (trackingStatusFilter === 'ALL') {
+      return report.rows || []
+    }
+
+    return (report.rows || []).filter((row) => {
+      return row.trackingStatus === trackingStatusFilter
+    })
+  }, [report.rows, trackingStatusFilter])
 
   const tankerAssets = useMemo(() => {
     return assets.filter((asset) => {
@@ -351,6 +389,61 @@ function TankerTracking({
     }
   }
 
+  const openClosePanel = (row) => {
+    if (!row.acknowledgementId) {
+      alert('Acknowledgement ID is missing. Cannot close this movement.')
+      return
+    }
+
+    if (!row.latestReceiverTicket || !row.quantityComparison) {
+      alert(
+        'Movement can be closed only after receiver ticket is Approved and comparison is available.'
+      )
+      return
+    }
+
+    setCloseGroup(row)
+    setClosureRemarks('')
+  }
+
+  const closeClosePanel = () => {
+    setCloseGroup(null)
+    setClosureRemarks('')
+  }
+
+  const handleCloseMovement = async () => {
+    if (!closeGroup?.acknowledgementId) {
+      alert('Acknowledgement ID is missing.')
+      return
+    }
+
+    const confirmed = window.confirm(
+      `Close tanker movement for convoy ${closeGroup.convoyNumber}?`
+    )
+
+    if (!confirmed) {
+      return
+    }
+
+    try {
+      setLoading(true)
+
+      await closeTankerMovement({
+        acknowledgementId: closeGroup.acknowledgementId,
+        closureRemarks,
+      })
+
+      alert('Tanker movement closed successfully')
+
+      closeClosePanel()
+      await loadTracking()
+    } catch (error) {
+      alert(error.message || 'Unable to close tanker movement')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleCreateReceiverEntry = (row) => {
     if (!row.senderTicket) {
       alert('Sender ticket is missing. Cannot create receiver entry.')
@@ -481,7 +574,7 @@ function TankerTracking({
       'Seal M2',
     ]
 
-    const rows = report.rows.map((row) => {
+    const rows = filteredTrackingRows.map((row) => {
       const comparison = row.quantityComparison
       const sender = row.senderTicket
       const receiver = row.latestReceiverTicket
@@ -530,7 +623,7 @@ function TankerTracking({
   }
 
   const exportExcel = () => {
-    const rowsHtml = report.rows
+    const rowsHtml = filteredTrackingRows
       .map((row) => {
         const comparison = row.quantityComparison
         const sender = row.senderTicket
@@ -701,6 +794,99 @@ function TankerTracking({
         </div>
       </div>
 
+      <div className="tanker-exception-dashboard no-print">
+        <button
+          type="button"
+          className={`exception-card ${
+            trackingStatusFilter === 'ALL' ? 'selected' : ''
+          }`}
+          onClick={() => setTrackingStatusFilter('ALL')}
+        >
+          <span>All</span>
+          <strong>{trackingExceptionSummary.all}</strong>
+        </button>
+
+        <button
+          type="button"
+          className={`exception-card pending ${
+            trackingStatusFilter === 'PENDING_RECEIPT' ? 'selected' : ''
+          }`}
+          onClick={() => setTrackingStatusFilter('PENDING_RECEIPT')}
+        >
+          <span>Pending Receipt</span>
+          <strong>{trackingExceptionSummary.pendingReceipt}</strong>
+        </button>
+
+        <button
+          type="button"
+          className={`exception-card acknowledged ${
+            trackingStatusFilter === 'ACKNOWLEDGED' ? 'selected' : ''
+          }`}
+          onClick={() => setTrackingStatusFilter('ACKNOWLEDGED')}
+        >
+          <span>Acknowledged</span>
+          <strong>{trackingExceptionSummary.acknowledged}</strong>
+        </button>
+
+        <button
+          type="button"
+          className={`exception-card danger ${
+            trackingStatusFilter === 'SEAL_MISMATCH' ? 'selected' : ''
+          }`}
+          onClick={() => setTrackingStatusFilter('SEAL_MISMATCH')}
+        >
+          <span>Seal Mismatch</span>
+          <strong>{trackingExceptionSummary.sealMismatch}</strong>
+        </button>
+
+        <button
+          type="button"
+          className={`exception-card warning ${
+            trackingStatusFilter === 'QUANTITY_VARIANCE' ? 'selected' : ''
+          }`}
+          onClick={() => setTrackingStatusFilter('QUANTITY_VARIANCE')}
+        >
+          <span>Quantity Variance</span>
+          <strong>{trackingExceptionSummary.quantityVariance}</strong>
+        </button>
+
+        <button
+          type="button"
+          className={`exception-card success ${
+            trackingStatusFilter === 'MATCHED' ? 'selected' : ''
+          }`}
+          onClick={() => setTrackingStatusFilter('MATCHED')}
+        >
+          <span>Matched</span>
+          <strong>{trackingExceptionSummary.matched}</strong>
+        </button>
+
+        <button
+          type="button"
+          className={`exception-card success ${
+            trackingStatusFilter === 'CLOSED' ? 'selected' : ''
+          }`}
+          onClick={() => setTrackingStatusFilter('CLOSED')}
+        >
+          <span>Closed</span>
+          <strong>{trackingExceptionSummary.closed}</strong>
+        </button>
+      </div>
+
+      {trackingStatusFilter !== 'ALL' && (
+        <div className="info-box no-print">
+          Showing tanker tracking rows with status:{' '}
+          <strong>{getTrackingStatusLabel(trackingStatusFilter)}</strong>.
+          <button
+            type="button"
+            className="inline-action-btn"
+            onClick={() => setTrackingStatusFilter('ALL')}
+          >
+            Show All
+          </button>
+        </div>
+      )}
+
       <div className="info-box no-print">
         Tanker Tracking uses only <strong>Approved</strong> sender and receiver
         transactions. Draft or Submitted tickets will not move to receiver
@@ -831,14 +1017,14 @@ function TankerTracking({
         </thead>
 
         <tbody>
-          {report.rows.length === 0 ? (
+          {filteredTrackingRows.length === 0 ? (
             <tr>
               <td colSpan="11" className="empty-table">
                 No tanker tracking records found.
               </td>
             </tr>
           ) : (
-            report.rows.map((row) => {
+            filteredTrackingRows.map((row) => {
               const comparison = row.quantityComparison
               const sealMismatch = row.sealChecks.some((seal) => {
                 return (
@@ -977,6 +1163,18 @@ function TankerTracking({
                           Print MTR
                         </button>
                       )}
+
+                      {row.quantityComparison &&
+                        row.acknowledgementId &&
+                        row.trackingStatus !== 'CLOSED' && (
+                          <button
+                            type="button"
+                            onClick={() => openClosePanel(row)}
+                            disabled={loading}
+                          >
+                            Close
+                          </button>
+                        )}
 
                       {row.trackingStatus === 'PENDING_RECEIPT' &&
                         row.senderTicket && (
@@ -1192,6 +1390,115 @@ function TankerTracking({
         </div>
       )}
 
+      {closeGroup && (
+        <div className="report-detail-panel no-print">
+          <div className="report-detail-header">
+            <div>
+              <h3>Close Tanker Movement</h3>
+              <p>
+                Convoy {closeGroup.convoyNumber} /{' '}
+                {closeGroup.tankerAssetName || closeGroup.tankerAssetCode}
+              </p>
+            </div>
+
+            <button type="button" onClick={closeClosePanel}>
+              Close
+            </button>
+          </div>
+
+          <div className="info-box">
+            Closing confirms that sender and receiver comparison has been
+            reviewed. This does not modify sender or receiver tickets.
+          </div>
+
+          {closeGroup.quantityComparison && (
+            <table className="comparison-table">
+              <thead>
+                <tr>
+                  <th>Parameter</th>
+                  <th className="number-cell">Sender</th>
+                  <th className="number-cell">Receiver</th>
+                  <th className="number-cell">Variance</th>
+                  <th className="number-cell">Variance %</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                <tr>
+                  <td>NSV</td>
+                  <td className="number-cell">
+                    {formatNumber(closeGroup.quantityComparison.senderNsvBbl)} bbl
+                  </td>
+                  <td className="number-cell">
+                    {formatNumber(closeGroup.quantityComparison.receiverNsvBbl)} bbl
+                  </td>
+                  <td className="number-cell">
+                    {formatNumber(closeGroup.quantityComparison.nsvVarianceBbl)} bbl
+                  </td>
+                  <td className="number-cell">
+                    {formatPercent(closeGroup.quantityComparison.nsvVariancePercent)}
+                  </td>
+                </tr>
+
+                <tr>
+                  <td>LT</td>
+                  <td className="number-cell">
+                    {formatNumber(closeGroup.quantityComparison.senderLt)}
+                  </td>
+                  <td className="number-cell">
+                    {formatNumber(closeGroup.quantityComparison.receiverLt)}
+                  </td>
+                  <td className="number-cell">
+                    {formatNumber(closeGroup.quantityComparison.ltVariance)}
+                  </td>
+                  <td className="number-cell">-</td>
+                </tr>
+
+                <tr>
+                  <td>MT</td>
+                  <td className="number-cell">
+                    {formatNumber(closeGroup.quantityComparison.senderMt)}
+                  </td>
+                  <td className="number-cell">
+                    {formatNumber(closeGroup.quantityComparison.receiverMt)}
+                  </td>
+                  <td className="number-cell">
+                    {formatNumber(closeGroup.quantityComparison.mtVariance)}
+                  </td>
+                  <td className="number-cell">-</td>
+                </tr>
+              </tbody>
+            </table>
+          )}
+
+          <div className="operation-entry-subgrid">
+            <div className="full-width-field">
+              <label>Closure / Settlement Remarks</label>
+              <textarea
+                rows="4"
+                value={closureRemarks}
+                onChange={(e) => setClosureRemarks(e.target.value)}
+                placeholder="Example: Variance reviewed and accepted within operational tolerance."
+              />
+            </div>
+          </div>
+
+          <div className="form-actions">
+            <button
+              type="button"
+              onClick={handleCloseMovement}
+              disabled={loading}
+            >
+              {loading ? 'Closing...' : 'Confirm Close Movement'}
+            </button>
+
+            <button type="button" onClick={closeClosePanel} disabled={loading}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       {selectedGroup && (
         <div className="report-detail-panel no-print">
           <div className="report-detail-header">
@@ -1241,6 +1548,18 @@ function TankerTracking({
                 </button>
               )}
 
+              {selectedGroup.quantityComparison &&
+                selectedGroup.acknowledgementId &&
+                selectedGroup.trackingStatus !== 'CLOSED' && (
+                  <button
+                    type="button"
+                    onClick={() => openClosePanel(selectedGroup)}
+                    disabled={loading}
+                  >
+                    Close Movement
+                  </button>
+                )}
+
               <button type="button" onClick={() => setSelectedGroup(null)}>
                 Close
               </button>
@@ -1252,6 +1571,15 @@ function TankerTracking({
               {selectedGroup.warningMessages.map((message) => (
                 <div key={message}>{message}</div>
               ))}
+            </div>
+          )}
+
+          {selectedGroup.trackingStatus === 'CLOSED' && (
+            <div className="info-box">
+              <strong>Movement Closed</strong>
+              <div>Closed By: {selectedGroup.closedBy || '-'}</div>
+              <div>Closed At: {selectedGroup.closedAt || '-'}</div>
+              <div>Closure Remarks: {selectedGroup.closureRemarks || '-'}</div>
             </div>
           )}
 

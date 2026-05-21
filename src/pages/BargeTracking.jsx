@@ -2,13 +2,13 @@ import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   createTripEvent,
-  getConvoyTracker,
+  getBargeTracking,
   getTripTimelineByConvoy,
   closeTrip,
   reopenTrip,
-} from '../api/convoyTrackerApi'
+} from '../api/bargeTrackingApi'
 
-function ConvoyTracker({ loggedInUser, assets = [], locations = [] }) {
+function BargeTracking({ loggedInUser, assets = [], locations = [] }) {
   const [convoyNumber, setConvoyNumber] = useState('')
   const [loading, setLoading] = useState(false)
   const [tracker, setTracker] = useState(null)
@@ -44,6 +44,39 @@ function ConvoyTracker({ loggedInUser, assets = [], locations = [] }) {
   const tripStatus = String(timeline?.trip?.status || 'OPEN').toUpperCase()
   const isTripClosed = tripStatus === 'CLOSED'
 
+  const getPendingComparisonAssetCodes = () => {
+    const assetCodes = (tracker?.assets || [])
+      .map((item) => String(item.asset_code || '').trim())
+      .filter(Boolean)
+
+    const comparisonAssetCodes = new Set(
+      (timeline?.comparisons || [])
+        .map((comparison) => {
+          return (
+            String(comparison.asset_code || '').trim() ||
+            String(comparison.assetCode || '').trim() ||
+            String(comparison.summary_json?.asset_code || '').trim()
+          )
+        })
+        .filter(Boolean)
+    )
+
+    return assetCodes.filter((assetCode) => !comparisonAssetCodes.has(assetCode))
+  }
+
+  const hasApprovedBargeComparison = () => {
+    return getPendingComparisonAssetCodes().length === 0
+  }
+
+  const canCloseBargeMovement = () => {
+    return (
+      Boolean(timeline?.trip?.id) &&
+      !isTripClosed &&
+      (tracker?.assets || []).length > 0 &&
+      hasApprovedBargeComparison()
+    )
+  }
+
   const getAssetName = (assetCode) => {
     const a = (assets || []).find((x) => String(x.assetCode) === String(assetCode))
     return a ? a.assetName : ''
@@ -63,7 +96,7 @@ function ConvoyTracker({ loggedInUser, assets = [], locations = [] }) {
 
     setLoading(true)
     try {
-      const trackerData = await getConvoyTracker(clean)
+      const trackerData = await getBargeTracking(clean)
       setTracker(trackerData)
 
       const timelineData = await getTripTimelineByConvoy(clean)
@@ -170,7 +203,7 @@ function ConvoyTracker({ loggedInUser, assets = [], locations = [] }) {
 
   const acknowledgeReceipt = async (assetCode) => {
     if (isTripClosed) {
-      alert('Trip is CLOSED. Reopen the trip to continue.')
+      alert('Barge Movement is CLOSED. Reopen it to continue.')
       return
     }
     if (!tracker?.convoy_number) return
@@ -220,7 +253,7 @@ function ConvoyTracker({ loggedInUser, assets = [], locations = [] }) {
 
   const revokeReceipt = async (assetCode) => {
     if (isTripClosed) {
-      alert('Trip is CLOSED. Reopen the trip to continue.')
+      alert('Barge Movement is CLOSED. Reopen it to continue.')
       return
     }
     if (!tracker?.convoy_number) return
@@ -258,37 +291,63 @@ function ConvoyTracker({ loggedInUser, assets = [], locations = [] }) {
     }
   }
 
-  const handleCloseTrip = async () => {
+  const handleCloseBargeMovement = async () => {
     if (!timeline?.trip?.id) return
-    const ok = window.confirm(
-      `Close Trip?\n\nConvoy: ${timeline.trip.convoy_number}\n\nAfter closing, no further entries/events are allowed until reopened.`
+
+    if (!hasApprovedBargeComparison()) {
+      const pendingAssets = getPendingComparisonAssetCodes()
+
+      alert(
+        'Barge movement can be closed only after comparison is available for every barge in this convoy.\n\n' +
+          `Pending barge(s): ${pendingAssets.join(', ')}`
+      )
+      return
+    }
+
+    const remarks = window.prompt(
+      `Close Barge Movement?\n\nConvoy: ${timeline.trip.convoy_number}\n\nEnter closure / settlement remarks:`,
+      'Reviewed and closed from Barge Tracking'
     )
-    if (!ok) return
+
+    if (remarks === null) return
 
     setLoading(true)
+
     try {
-      await closeTrip(timeline.trip.id, 'Closed from Convoy Tracker')
+      await closeTrip(
+        timeline.trip.id,
+        remarks || 'Reviewed and closed from Barge Tracking'
+      )
+
       await loadAll(timeline.trip.convoy_number)
     } catch (e) {
-      alert(e.message || 'Failed to close trip')
+      alert(e.message || 'Failed to close barge movement')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleReopenTrip = async () => {
+  const handleReopenBargeMovement = async () => {
     if (!timeline?.trip?.id) return
-    const ok = window.confirm(
-      `Reopen Trip?\n\nConvoy: ${timeline.trip.convoy_number}\n\nThis will allow entries/events again.`
+
+    const remarks = window.prompt(
+      `Reopen Barge Movement?\n\nConvoy: ${timeline.trip.convoy_number}\n\nEnter reopen remarks:`,
+      'Reopened from Barge Tracking'
     )
-    if (!ok) return
+
+    if (remarks === null) return
 
     setLoading(true)
+
     try {
-      await reopenTrip(timeline.trip.id, 'Reopened from Convoy Tracker')
+      await reopenTrip(
+        timeline.trip.id,
+        remarks || 'Reopened from Barge Tracking'
+      )
+
       await loadAll(timeline.trip.convoy_number)
     } catch (e) {
-      alert(e.message || 'Failed to reopen trip')
+      alert(e.message || 'Failed to reopen barge movement')
     } finally {
       setLoading(false)
     }
@@ -296,7 +355,7 @@ function ConvoyTracker({ loggedInUser, assets = [], locations = [] }) {
 
   const openFixPanel = (assetCode) => {
     if (isTripClosed) {
-      alert('Trip is CLOSED. Reopen the trip to continue.')
+      alert('Barge Movement is CLOSED. Reopen it to continue.')
       return
     }
     const convoy = tracker?.convoy_number || String(convoyNumber || '').trim()
@@ -330,7 +389,7 @@ function ConvoyTracker({ loggedInUser, assets = [], locations = [] }) {
 
   const saveFixPanel = async () => {
     if (isTripClosed) {
-      alert('Trip is CLOSED. Reopen the trip to continue.')
+      alert('Barge Movement is CLOSED. Reopen it to continue.')
       return
     }
 
@@ -409,202 +468,262 @@ function ConvoyTracker({ loggedInUser, assets = [], locations = [] }) {
 return (
     <div>
 
-      {/* Printable MTR-style Comparison Report (A4 Portrait, single-page optimized) */}
+      {/* Compact Barge MTR / Reconciliation Report */}
       {printReport.open && printReport.comparison && (
-        <div className="printable-report comparison-mtr-report">
-          <div className="print-report-header">
-            <div className="print-company-block">
-              <div className="print-logo-placeholder">LOGO</div>
-              <div>
-                <h1 style={{ margin: 0 }}>MTR Comparison Report</h1>
-                <p style={{ margin: '4px 0 0' }}>
-                  Convoy: <strong>{printReport.convoyNumber}</strong> | Barge:{' '}
-                  <strong>
-                    {printReport.assetName
-                      ? `${printReport.assetName} (${printReport.assetCode})`
-                      : printReport.assetCode}
-                  </strong>
-                </p>
-              </div>
-            </div>
+        <div className="printable-report barge-mtr-report">
+          {(() => {
+            const cmp = printReport.comparison
+            const summary = cmp.summary_json || {}
+            const left = summary.left || {}
+            const right = summary.right || {}
 
-            <div className="print-report-ticket">
-              <strong>{printReport.comparison?.comparison_type}</strong>
-              <span>Report Date</span>
-              <small>{new Date().toLocaleString()}</small>
-            </div>
-          </div>
+            const leftTotals = left.totals || {}
+            const rightTotals = right.totals || {}
+            const deltaTotals = (summary.delta || {}).totals || {}
 
-          <div className="print-report-section">
-            <h2>Compared Tickets</h2>
-            {(() => {
-              const cmp = printReport.comparison
-              const s = cmp.summary_json || {}
-              const left = s.left || {}
-              const right = s.right || {}
-              return (
-                <table className="mtr-table">
-                  <thead>
-                    <tr>
-                      <th></th>
-                      <th>Ticket</th>
-                      <th>Stage</th>
-                      <th>Date</th>
-                      <th>Location</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td><strong>LEFT</strong></td>
-                      <td>{left.ticket_number || cmp.left_ticket_number || cmp.left_transaction_id}</td>
-                      <td>{left.stage || ''}</td>
-                      <td>{left.operation_date || ''}</td>
-                      <td>{left.location_code || ''}</td>
-                    </tr>
-                    <tr>
-                      <td><strong>RIGHT</strong></td>
-                      <td>{right.ticket_number || cmp.right_ticket_number || cmp.right_transaction_id}</td>
-                      <td>{right.stage || ''}</td>
-                      <td>{right.operation_date || ''}</td>
-                      <td>{right.location_code || ''}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              )
-            })()}
-          </div>
+            const tanks =
+              cmp.per_tank_json && Array.isArray(cmp.per_tank_json.tanks)
+                ? cmp.per_tank_json.tanks
+                : []
 
-          <div className="print-report-section">
-            <h2>Totals</h2>
-            {(() => {
-              const cmp = printReport.comparison
-              const s = cmp.summary_json || {}
-              const leftTotals = (s.left || {}).totals || {}
-              const rightTotals = (s.right || {}).totals || {}
-              const deltaTotals = ((s.delta || {}).totals) || {}
-              const keys = ['GOV', 'GSV', 'NSV', 'TOV', 'FW', 'LT', 'MT', 'BSW']
+            const maxTankRows = 8
+            const shownTanks = tanks.slice(0, maxTankRows)
+            const moreTanks = tanks.length > maxTankRows
 
-              return (
-                <table className="mtr-table mtr-compact-table">
-                  <thead>
-                    <tr>
-                      <th>Item</th>
-                      <th>Left</th>
-                      <th>Right</th>
-                      <th>Diff</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {keys.map((k) => (
-                      <tr key={k}>
-                        <td><strong>{k}</strong></td>
-                        <td>{formatNumber(leftTotals[k])}</td>
-                        <td>{formatNumber(rightTotals[k])}</td>
-                        <td>{formatNumber(deltaTotals[k])}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )
-            })()}
-          </div>
+            const events = Array.isArray(printReport.events)
+              ? printReport.events.slice(0, 6)
+              : []
 
-          <div className="print-report-section">
-            <h2>Per Tank (Dips & Volumes)</h2>
-            {(() => {
-              const cmp = printReport.comparison
-              const tanks = (cmp.per_tank_json && cmp.per_tank_json.tanks) ? cmp.per_tank_json.tanks : []
-              const maxRows = 10
-              const shown = tanks.slice(0, maxRows)
-              const more = tanks.length > maxRows
+            const quantityKeys = ['GOV', 'GSV', 'NSV', 'TOV', 'FW', 'LT', 'MT']
 
-              return (
-                <>
-                  <table className="mtr-table mtr-compact-table">
-                    <thead>
-                      <tr>
-                        <th>Tank</th>
-                        <th>L Dip</th>
-                        <th>L TOV</th>
-                        <th>L FW</th>
-                        <th>R Dip</th>
-                        <th>R TOV</th>
-                        <th>R FW</th>
-                        <th>Δ TOV</th>
-                        <th>Δ FW</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {shown.length === 0 ? (
-                        <tr><td colSpan="9">No per-tank rows saved.</td></tr>
-                      ) : (
-                        shown.map((r) => {
-                          const l = r.left || {}
-                          const rr = r.right || {}
-                          const d = r.delta || {}
-                          return (
-                            <tr key={String(r.tank_id)}>
-                              <td><strong>{r.tank_id}</strong></td>
-                              <td>{formatNumber(l.total_dip, 1)}</td>
-                              <td>{formatNumber(l.tov)}</td>
-                              <td>{formatNumber(l.fw)}</td>
-                              <td>{formatNumber(rr.total_dip, 1)}</td>
-                              <td>{formatNumber(rr.tov)}</td>
-                              <td>{formatNumber(rr.fw)}</td>
-                              <td>{formatNumber(d.tov)}</td>
-                              <td>{formatNumber(d.fw)}</td>
-                            </tr>
-                          )
-                        })
-                      )}
-                    </tbody>
-                  </table>
-
-                  {more && (
-                    <p style={{ marginTop: 6, fontSize: 10 }}>
-                      Note: Only first {maxRows} tanks are shown to keep the report on one page.
+            return (
+              <>
+                <div className="barge-mtr-header">
+                  <div>
+                    <h1>BARGE MTR / RECONCILIATION REPORT</h1>
+                    <p>
+                      Convoy: <strong>{printReport.convoyNumber}</strong> | Barge:{' '}
+                      <strong>
+                        {printReport.assetName
+                          ? `${printReport.assetName} (${printReport.assetCode})`
+                          : printReport.assetCode}
+                      </strong>
                     </p>
-                  )}
-                </>
-              )
-            })()}
-          </div>
+                  </div>
 
-          <div className="print-report-section">
-            <h2>Trip Timeline (This Barge)</h2>
-            <table className="mtr-table mtr-compact-table">
-              <thead>
-                <tr>
-                  <th>Seq</th>
-                  <th>Event</th>
-                  <th>Date/Time</th>
-                  <th>Location</th>
-                  <th>Ticket</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(printReport.events || []).length === 0 ? (
-                  <tr><td colSpan="5">No timeline events.</td></tr>
-                ) : (
-                  printReport.events.map((ev) => (
-                    <tr key={ev.id}>
-                      <td>{ev.sequence_no}</td>
-                      <td>{ev.event_type}</td>
-                      <td>{ev.event_datetime || ''}</td>
-                      <td>{ev.location_name ? `${ev.location_name} (${ev.location_code})` : (ev.location_code || '')}</td>
-                      <td>{ev.ticket_number || ''}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  <div className="barge-mtr-meta">
+                    <span>Comparison Type</span>
+                    <strong>{cmp.comparison_type || '-'}</strong>
+                    <span>Report Date</span>
+                    <strong>{new Date().toLocaleString()}</strong>
+                  </div>
+                </div>
 
-          <div className="print-report-footer">
-            Printed from Hydrocarbon Accounting System | Comparison Report
-          </div>
+                <div className="barge-mtr-two-column">
+                  <div className="barge-mtr-section">
+                    <h2>Compared Tickets</h2>
 
-          {/* This closes the hidden report after printing when user navigates back */}
+                    <table className="barge-mtr-table">
+                      <thead>
+                        <tr>
+                          <th>Side</th>
+                          <th>Ticket</th>
+                          <th>Stage</th>
+                          <th>Date</th>
+                          <th>Location</th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        <tr>
+                          <td><strong>Sender</strong></td>
+                          <td>
+                            {left.ticket_number ||
+                              cmp.left_ticket_number ||
+                              cmp.left_transaction_id ||
+                              '-'}
+                          </td>
+                          <td>{left.stage || '-'}</td>
+                          <td>{left.operation_date || '-'}</td>
+                          <td>{left.location_code || '-'}</td>
+                        </tr>
+
+                        <tr>
+                          <td><strong>Receiver</strong></td>
+                          <td>
+                            {right.ticket_number ||
+                              cmp.right_ticket_number ||
+                              cmp.right_transaction_id ||
+                              '-'}
+                          </td>
+                          <td>{right.stage || '-'}</td>
+                          <td>{right.operation_date || '-'}</td>
+                          <td>{right.location_code || '-'}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="barge-mtr-section">
+                    <h2>Trip Timeline</h2>
+
+                    <table className="barge-mtr-table">
+                      <thead>
+                        <tr>
+                          <th>Seq</th>
+                          <th>Event</th>
+                          <th>Date/Time</th>
+                          <th>Loc.</th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        {events.length === 0 ? (
+                          <tr>
+                            <td colSpan="4">No timeline events.</td>
+                          </tr>
+                        ) : (
+                          events.map((ev) => (
+                            <tr key={ev.id}>
+                              <td>{ev.sequence_no || '-'}</td>
+                              <td>{ev.event_type || '-'}</td>
+                              <td>{ev.event_datetime || '-'}</td>
+                              <td>{ev.location_code || '-'}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="barge-mtr-two-column">
+                  <div className="barge-mtr-section">
+                    <h2>Quantity Summary</h2>
+
+                    <table className="barge-mtr-table barge-mtr-number-table">
+                      <thead>
+                        <tr>
+                          <th>Qty</th>
+                          <th>Sender</th>
+                          <th>Receiver</th>
+                          <th>Diff.</th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        {quantityKeys.map((key) => (
+                          <tr key={key}>
+                            <td><strong>{key}</strong></td>
+                            <td>{formatNumber(leftTotals[key])}</td>
+                            <td>{formatNumber(rightTotals[key])}</td>
+                            <td>{formatNumber(deltaTotals[key])}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="barge-mtr-section">
+                    <h2>Per Tank Summary</h2>
+
+                    <table className="barge-mtr-table barge-mtr-number-table">
+                      <thead>
+                        <tr>
+                          <th>Tank</th>
+                          <th>S Dip</th>
+                          <th>S TOV</th>
+                          <th>R Dip</th>
+                          <th>R TOV</th>
+                          <th>Δ TOV</th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        {shownTanks.length === 0 ? (
+                          <tr>
+                            <td colSpan="6">No per-tank rows saved.</td>
+                          </tr>
+                        ) : (
+                          shownTanks.map((row) => {
+                            const senderTank = row.left || {}
+                            const receiverTank = row.right || {}
+                            const deltaTank = row.delta || {}
+
+                            return (
+                              <tr key={String(row.tank_id)}>
+                                <td><strong>{row.tank_id}</strong></td>
+                                <td>{formatNumber(senderTank.total_dip, 1)}</td>
+                                <td>{formatNumber(senderTank.tov)}</td>
+                                <td>{formatNumber(receiverTank.total_dip, 1)}</td>
+                                <td>{formatNumber(receiverTank.tov)}</td>
+                                <td>{formatNumber(deltaTank.tov)}</td>
+                              </tr>
+                            )
+                          })
+                        )}
+                      </tbody>
+                    </table>
+
+                    {moreTanks && (
+                      <p className="barge-mtr-note">
+                        Note: Only first {maxTankRows} tanks are shown to keep the
+                        report on one A4 page.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="barge-mtr-section">
+                  <h2>Remarks / Review</h2>
+
+                  <div className="barge-mtr-remarks-grid">
+                    <div>
+                      <span>Comparison Remarks</span>
+                      <strong>{cmp.remarks || '-'}</strong>
+                    </div>
+
+                    <div>
+                      <span>Generated By</span>
+                      <strong>{loggedInUser?.fullName || loggedInUser?.username || '-'}</strong>
+                    </div>
+
+                    <div>
+                      <span>System Note</span>
+                      <strong>Approved sender/receiver comparison only</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="barge-mtr-signature-grid">
+                  <div>
+                    <strong>Prepared By</strong>
+                    <span>Name / Signature / Date</span>
+                  </div>
+
+                  <div>
+                    <strong>Sender Representative</strong>
+                    <span>Name / Signature / Date</span>
+                  </div>
+
+                  <div>
+                    <strong>Receiver Representative</strong>
+                    <span>Name / Signature / Date</span>
+                  </div>
+
+                  <div>
+                    <strong>Approved By</strong>
+                    <span>Name / Signature / Date</span>
+                  </div>
+                </div>
+
+                <div className="barge-mtr-footer">
+                  Printed from Hydrocarbon Accounting System | Barge Tracking
+                </div>
+              </>
+            )
+          })()}
+
           <div className="no-print" style={{ marginTop: 10 }}>
             <button type="button" onClick={closeComparisonReport}>
               Close Report
@@ -615,9 +734,18 @@ return (
 
       <div className="page-title">
         <div>
-          <h2>Convoy Tracker</h2>
-          <p>Search by Convoy Number. Each barge shows its own timeline and comparisons.</p>
+          <h2>Barge Tracking</h2>
+          <p>
+            Track approved barge sender and receiver movements by convoy number,
+            compare quantities, and review transit variance.
+          </p>
         </div>
+      </div>
+
+      <div className="info-box no-print">
+        Barge Tracking uses only <strong>Approved</strong> sender and receiver
+        transactions. Draft or Submitted tickets will not move to receiver tracking or
+        comparison.
       </div>
 
       <form onSubmit={handleSearch}>
@@ -651,18 +779,40 @@ return (
 
             {timeline?.trip?.id && (
               <div className="form-actions" style={{ marginTop: 10 }}>
-                <button type="button" disabled={loading || isTripClosed} onClick={handleCloseTrip}>
-                  Close Trip
+                <button
+                  type="button"
+                  disabled={loading || !canCloseBargeMovement()}
+                  onClick={handleCloseBargeMovement}
+                  title={
+                    !hasApprovedBargeComparison()
+                      ? `Pending comparison for: ${getPendingComparisonAssetCodes().join(
+                          ', '
+                        )}`
+                      : ''
+                  }
+                >
+                  Close Barge Movement
                 </button>
-                <button type="button" disabled={loading || !isTripClosed} onClick={handleReopenTrip}>
-                  Reopen Trip
+
+                <button
+                  type="button"
+                  disabled={loading || !isTripClosed}
+                  onClick={handleReopenBargeMovement}
+                >
+                  Reopen Barge Movement
                 </button>
               </div>
             )}
 
             {isTripClosed && (
               <div className="info-box">
-                Trip is CLOSED. All entry actions are locked until reopened.
+                <strong>Barge Movement Closed.</strong> All entry actions are locked until
+                reopened.
+                {timeline?.trip?.remarks && (
+                  <div style={{ marginTop: 6 }}>
+                    <strong>Remarks:</strong> {timeline.trip.remarks}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -861,8 +1011,11 @@ return (
                           <td>{c.created_by || '-'}</td>
                           <td>{c.remarks || '-'}</td>
                           <td>
-                            <button type="button" onClick={() => openComparisonReport(c, bargeEvents, assetCode, assetName)}>
-                              Comparison Report
+                            <button
+                              type="button"
+                              onClick={() => openComparisonReport(c, bargeEvents, assetCode, assetName)}
+                            >
+                              Print MTR
                             </button>
                           </td>
                         </tr>
@@ -961,4 +1114,4 @@ return (
   )
 }
 
-export default ConvoyTracker
+export default BargeTracking
