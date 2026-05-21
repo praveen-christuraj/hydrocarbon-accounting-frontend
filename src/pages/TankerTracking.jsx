@@ -5,6 +5,7 @@ import {
   getTankerTracking,
   revokeTankerAcknowledgement,
 } from '../api/tankerTrackingApi'
+import TankerMtrComparisonReport from '../components/reports/TankerMtrComparisonReport'
 
 const today = new Date().toISOString().slice(0, 10)
 
@@ -112,6 +113,7 @@ function TankerTracking({
     quantityVarianceGroups: 0,
   })
   const [selectedGroup, setSelectedGroup] = useState(null)
+  const [printGroup, setPrintGroup] = useState(null)
   const [ackGroup, setAckGroup] = useState(null)
   const [ackForm, setAckForm] = useState({
     receiverLocationCode: '',
@@ -430,6 +432,35 @@ function TankerTracking({
     navigate(`/operation-entry?${params.toString()}`)
   }
 
+  const openOperationTicket = (transactionId) => {
+    if (!transactionId) {
+      alert('Transaction ID is missing.')
+      return
+    }
+
+    navigate(`/operation-transactions/${transactionId}`)
+  }
+
+  const handlePrintMtrReport = (row) => {
+    if (!row.senderTicket) {
+      alert('Sender ticket is missing. Cannot print report.')
+      return
+    }
+
+    if (!row.latestReceiverTicket || !row.quantityComparison) {
+      alert(
+        'MTR comparison report is available only after the receiver ticket is Approved and compared.'
+      )
+      return
+    }
+
+    setPrintGroup(row)
+
+    window.setTimeout(() => {
+      window.print()
+    }, 100)
+  }
+
   const exportCsv = () => {
     const headers = [
       'Convoy Number',
@@ -572,7 +603,18 @@ function TankerTracking({
 
     return (
       <div className="tracking-ticket-card">
-        <h4>{title}</h4>
+        <div className="tracking-ticket-card-header">
+          <h4>{title}</h4>
+
+          {ticket.transactionId && (
+            <button
+              type="button"
+              onClick={() => openOperationTicket(ticket.transactionId)}
+            >
+              Open Ticket
+            </button>
+          )}
+        </div>
 
         <div className="tracking-ticket-grid">
           <span>Ticket</span>
@@ -900,6 +942,42 @@ function TankerTracking({
                         View
                       </button>
 
+                      {row.senderTicket?.transactionId && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            openOperationTicket(row.senderTicket.transactionId)
+                          }
+                          disabled={loading}
+                        >
+                          Sender
+                        </button>
+                      )}
+
+                      {row.latestReceiverTicket?.transactionId && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            openOperationTicket(
+                              row.latestReceiverTicket.transactionId
+                            )
+                          }
+                          disabled={loading}
+                        >
+                          Receiver
+                        </button>
+                      )}
+
+                      {row.quantityComparison && (
+                        <button
+                          type="button"
+                          onClick={() => handlePrintMtrReport(row)}
+                          disabled={loading}
+                        >
+                          Print MTR
+                        </button>
+                      )}
+
                       {row.trackingStatus === 'PENDING_RECEIPT' &&
                         row.senderTicket && (
                           <button
@@ -1126,9 +1204,47 @@ function TankerTracking({
               </p>
             </div>
 
-            <button type="button" onClick={() => setSelectedGroup(null)}>
-              Close
-            </button>
+            <div className="table-actions">
+              {selectedGroup.senderTicket?.transactionId && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    openOperationTicket(selectedGroup.senderTicket.transactionId)
+                  }
+                  disabled={loading}
+                >
+                  Open Sender Ticket
+                </button>
+              )}
+
+              {selectedGroup.latestReceiverTicket?.transactionId && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    openOperationTicket(
+                      selectedGroup.latestReceiverTicket.transactionId
+                    )
+                  }
+                  disabled={loading}
+                >
+                  Open Receiver Ticket
+                </button>
+              )}
+
+              {selectedGroup.quantityComparison && (
+                <button
+                  type="button"
+                  onClick={() => handlePrintMtrReport(selectedGroup)}
+                  disabled={loading}
+                >
+                  Print MTR
+                </button>
+              )}
+
+              <button type="button" onClick={() => setSelectedGroup(null)}>
+                Close
+              </button>
+            </div>
           </div>
 
           {selectedGroup.warningMessages.length > 0 && (
@@ -1284,6 +1400,12 @@ function TankerTracking({
               and tanker.
             </div>
           )}
+        </div>
+      )}
+
+      {printGroup && (
+        <div className="print-only">
+          <TankerMtrComparisonReport group={printGroup} />
         </div>
       )}
     </div>
