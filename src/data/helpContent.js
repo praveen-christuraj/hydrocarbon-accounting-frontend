@@ -256,6 +256,18 @@ export const helpContent = {
       'Comparisons will be auto-generated in the next step (Load After vs Unload Before).',
     ],
   },
+  '/shuttle-tracking': {
+    title: 'Shuttle Tracking Help',
+    description:
+      'Track Shuttle vessel voyages within a single location using Approved tickets only. Create loading/top-up/STS/unloading actions from this page using soft-coded Vessel Operations.',
+    points: [
+      'Tracking key = Location + Shuttle Number + Shuttle Asset.',
+      'Only Approved tickets appear in tracking and reconciliation.',
+      'Stages are soft-coded in Vessel Operation Master (use Show In = Tracking for STS IN/OUT).',
+      'Close Voyage locks new approvals until reopened.',
+      'Use Movement Mapping (BARGE → SHUTTLE) to reconcile Barge unload totals to Shuttle loading totals.',
+    ],
+  },
   '/out-turn-report': {
     title: 'Out-Turn Report Help',
     description:

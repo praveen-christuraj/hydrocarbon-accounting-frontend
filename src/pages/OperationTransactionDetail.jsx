@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   getOperationTransactionDetail,
   updateOperationTransactionStatus,
@@ -213,6 +213,40 @@ const isMultiTankPayloadField = (field) => {
   return field.fieldCode === 'multi_tank_payload'
 }
 
+const getShuttlePayloadFromTransaction = (transaction) => {
+  if (!transaction || !Array.isArray(transaction.fieldValues)) {
+    return null
+  }
+
+  const payloadField = transaction.fieldValues.find((field) => {
+    return field.fieldCode === 'shuttle_payload'
+  })
+
+  if (!payloadField || !payloadField.fieldValue) {
+    return null
+  }
+
+  if (typeof payloadField.fieldValue === 'object') {
+    return payloadField.fieldValue
+  }
+
+  const rawValue = String(payloadField.fieldValue || '').trim()
+
+  if (rawValue === '' || rawValue === '[object Object]') {
+    return null
+  }
+
+  try {
+    return JSON.parse(rawValue)
+  } catch {
+    return null
+  }
+}
+
+const isShuttlePayloadField = (field) => {
+  return field.fieldCode === 'shuttle_payload'
+}
+
 function TankCalculatedSummary({ calculated }) {
   return (
     <div className="live-calculation-grid tank-live-grid">
@@ -410,16 +444,79 @@ function MultiTankCalculatedSummary({ payload }) {
   )
 }
 
+function ShuttleCalculatedSummary({ payload }) {
+  if (!payload) return null
+
+  const meta = payload.meta || {}
+  const inputs = payload.inputs || {}
+  const net = (payload.calculated || {}).net || {}
+
+  const opLabel =
+    meta.vessel_operation_label ||
+    meta.vessel_operation_code ||
+    'Shuttle Operation'
+
+  const time = inputs.event_time || '-'
+
+  const openingStock = Number(inputs.opening_stock_bbl || 0)
+  const openingWater = Number(inputs.opening_water_bbl || 0)
+  const closingStock = Number(inputs.closing_stock_bbl || 0)
+  const closingWater = Number(inputs.closing_water_bbl || 0)
+
+  // Net Stock is NSV rule already applied in payload
+  const netStock = Number(net.net_stock_bbl ?? net.NSV ?? 0)
+  const netWater = Number(net.net_water_bbl ?? net.FW ?? 0)
+
+  const bargeRef = inputs.barge_reference || '-'
+  const remarks = inputs.remarks || '-'
+
+  const Row = ({ label, value }) => (
+    <div className="live-calculation-card">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  )
+
+  return (
+    <>
+      <div className="section-title compact-section-title">
+        <h3>Shuttle Ticket Summary</h3>
+      </div>
+
+      <div className="info-box">
+        <strong>Operation:</strong> {opLabel} &nbsp; | &nbsp; <strong>Time:</strong> {time}
+      </div>
+
+      <div className="live-calculation-grid tank-live-grid">
+        <Row label="Opening Stock" value={openingStock.toFixed(3)} />
+        <Row label="Opening Water" value={openingWater.toFixed(3)} />
+        <Row label="Closing Stock" value={closingStock.toFixed(3)} />
+        <Row label="Closing Water" value={closingWater.toFixed(3)} />
+        <Row label="Net Stock" value={netStock.toFixed(3)} />
+        <Row label="Net Water" value={netWater.toFixed(3)} />
+      </div>
+
+      <div className="info-box" style={{ marginTop: 10 }}>
+        <div><strong>Barge Reference:</strong> {bargeRef}</div>
+        <div style={{ marginTop: 6 }}><strong>Remarks:</strong> {remarks}</div>
+      </div>
+    </>
+  )
+}
+
 function ReviewConfirmationModal({
   transaction,
   tankPayload,
   multiTankPayload,
+  shuttlePayload,
   nextStatus,
   remarks,
   onRemarksChange,
   onClose,
   onConfirm,
   statusLoading,
+  pendingReviewConfirmed,
+  setPendingReviewConfirmed,
 }) {
   if (!transaction || !nextStatus) {
     return null
@@ -453,10 +550,13 @@ function ReviewConfirmationModal({
 
   const hasMandatoryMissing = mandatoryMissing.length > 0
 
+  const requiresReviewTick = nextStatus === 'Submitted' || nextStatus === 'Approved'
+
   const canConfirm =
     !submitHasMissingTemp &&
     !hasMandatoryMissing &&
-    (!remarksRequired || !remarksEmpty)
+    (!remarksRequired || !remarksEmpty) &&
+    (!requiresReviewTick || pendingReviewConfirmed)
 
   return (
     <div className="review-modal-backdrop">
@@ -556,60 +656,7 @@ function ReviewConfirmationModal({
         {tankPayload ? (
           <>
             <div className="section-title compact-section-title">
-              <h3>Tank Gauging Input Summary</h3>
-            </div>
-
-            <div className="approval-review-grid">
-              <div>
-                <span>Gauging Date</span>
-                <strong>{inputs.gaugingDate || '-'}</strong>
-              </div>
-              <div>
-                <span>Gauging Time</span>
-                <strong>{inputs.gaugingTime || '-'}</strong>
-              </div>
-              <div>
-                <span>Dip</span>
-                <strong>{formatValue(inputs.dipCm)} cm</strong>
-              </div>
-              <div>
-                <span>Water Level</span>
-                <strong>{formatValue(inputs.waterLevelCm)} cm</strong>
-              </div>
-              <div>
-                <span>Tank Temperature</span>
-                <strong>
-                  {formatValue(inputs.tankTemperature)} °
-                  {inputs.tankTemperatureUnit || ''}
-                </strong>
-              </div>
-              <div>
-                <span>Observed Type</span>
-                <strong>{inputs.observedInputType || '-'}</strong>
-              </div>
-              <div>
-                <span>Observed API</span>
-                <strong>{formatValue(inputs.observedApi)}</strong>
-              </div>
-              <div>
-                <span>Observed Density</span>
-                <strong>{formatValue(inputs.observedDensity)} kg/m³</strong>
-              </div>
-              <div>
-                <span>Sample Temperature</span>
-                <strong>
-                  {formatValue(inputs.sampleTemperature)} °
-                  {inputs.sampleTemperatureUnit || ''}
-                </strong>
-              </div>
-              <div>
-                <span>BS&W</span>
-                <strong>{formatValue(inputs.bswPercent)}%</strong>
-              </div>
-            </div>
-
-            <div className="section-title compact-section-title">
-              <h3>Calculated Quantity Summary</h3>
+              <h3>Tank Gauging Summary</h3>
             </div>
 
             <TankCalculatedSummary calculated={calculated} />
@@ -619,8 +666,11 @@ function ReviewConfirmationModal({
             <div className="section-title compact-section-title">
               <h3>Multi-Tank Before / After Summary</h3>
             </div>
+
             <MultiTankCalculatedSummary payload={multiTankPayload} />
           </>
+        ) : shuttlePayload ? (
+          <ShuttleCalculatedSummary payload={shuttlePayload} />
         ) : (
           <div className="info-box">
             No asset-specific payload found. Please review the saved field values below before confirming.
@@ -652,6 +702,22 @@ function ReviewConfirmationModal({
             />
           </div>
         )}
+
+        {requiresReviewTick ? (
+          <div className="info-box" style={{ marginTop: 10 }}>
+            <label style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <input
+                type="checkbox"
+                checked={pendingReviewConfirmed}
+                onChange={(e) => setPendingReviewConfirmed(e.target.checked)}
+              />
+              <strong>I have reviewed the entered data and calculated quantities</strong>
+            </label>
+            <div style={{ marginTop: 6, opacity: 0.85, fontSize: 12 }}>
+              Mandatory for Submit/Approve.
+            </div>
+          </div>
+        ) : null}
 
         <div className="form-actions">
           <button type="button" onClick={onConfirm} disabled={statusLoading || !canConfirm}>
@@ -1383,6 +1449,7 @@ function PrintableMultiTankReport({
 
 function OperationTransactionDetail({ loggedInUser }) {
   const { transactionId } = useParams()
+  const navigate = useNavigate()
 
   const [transaction, setTransaction] = useState(null)
   const [statusHistory, setStatusHistory] = useState([])
@@ -1391,6 +1458,7 @@ function OperationTransactionDetail({ loggedInUser }) {
 
   const [pendingStatus, setPendingStatus] = useState('')
   const [pendingRemarks, setPendingRemarks] = useState('')
+  const [pendingReviewConfirmed, setPendingReviewConfirmed] = useState(false)
   const [reportProfiles, setReportProfiles] = useState([])
   const [selectedReportProfileName, setSelectedReportProfileName] = useState(
     loadSelectedReportProfileName
@@ -1475,6 +1543,10 @@ function OperationTransactionDetail({ loggedInUser }) {
     return getMultiTankPayloadFromTransaction(transaction)
   }, [transaction])
 
+  const shuttlePayload = useMemo(() => {
+    return getShuttlePayloadFromTransaction(transaction)
+  }, [transaction])
+
   const hasTankerPayload = (transaction?.fieldValues || []).some((value) => {
     return value.fieldCode === 'tanker_payload'
   })
@@ -1557,11 +1629,13 @@ function OperationTransactionDetail({ loggedInUser }) {
 
     setPendingStatus(nextStatus)
     setPendingRemarks(defaultRemarks)
+    setPendingReviewConfirmed(false)
   }
 
   const closeReviewModal = () => {
     setPendingStatus('')
     setPendingRemarks('')
+    setPendingReviewConfirmed(false)
   }
 
   const formatCsvValue = (value) => {
@@ -1756,7 +1830,8 @@ function OperationTransactionDetail({ loggedInUser }) {
       await updateOperationTransactionStatus(
         transaction.id,
         pendingStatus,
-        pendingRemarks
+        pendingRemarks,
+        pendingReviewConfirmed
       )
 
       await loadTransactionDetail()
@@ -1904,6 +1979,10 @@ function OperationTransactionDetail({ loggedInUser }) {
       return <small>Hidden - Multi-Tank payload is shown above.</small>
     }
 
+    if (isShuttlePayloadField(field)) {
+      return <small>Hidden - Shuttle payload is shown above.</small>
+    }
+
     if (typeof field.fieldValue === 'object') {
       return <small>Structured JSON payload</small>
     }
@@ -1993,12 +2072,15 @@ function OperationTransactionDetail({ loggedInUser }) {
         transaction={transaction}
         tankPayload={tankPayload}
         multiTankPayload={multiTankPayload}
+        shuttlePayload={shuttlePayload}
         nextStatus={pendingStatus}
         remarks={pendingRemarks}
         onRemarksChange={setPendingRemarks}
         onClose={closeReviewModal}
         onConfirm={confirmStatusChange}
         statusLoading={statusLoading}
+        pendingReviewConfirmed={pendingReviewConfirmed}
+        setPendingReviewConfirmed={setPendingReviewConfirmed}
       />
 
       <div className="page-title">
@@ -2010,9 +2092,20 @@ function OperationTransactionDetail({ loggedInUser }) {
           </p>
         </div>
 
-        <span className={`status-badge ${transaction.status.toLowerCase()}`}>
-          {transaction.status}
-        </span>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="no-print"
+            onClick={() => navigate(-1)}
+            title="Close and go back"
+          >
+            Close
+          </button>
+
+          <span className={`status-badge ${transaction.status.toLowerCase()}`}>
+            {transaction.status}
+          </span>
+        </div>
       </div>
 
       <div className="info-box">
@@ -2196,15 +2289,15 @@ function OperationTransactionDetail({ loggedInUser }) {
       <div className="section-title">
         <h3>Status Actions</h3>
         <p>
-          Click an action to open a final review window before the status is
-          changed.
+          Change the ticket status using the actions below.
         </p>
       </div>
 
-      <div className="form-actions">
-        {renderStatusActions()}
-
-        {statusLoading && <span className="warning-text">Updating...</span>}
+      <div className="info-box">
+        <div className="form-actions" style={{ marginTop: 0 }}>
+          {renderStatusActions()}
+          {statusLoading && <span className="warning-text">Updating...</span>}
+        </div>
       </div>
 
       <div className="section-title">

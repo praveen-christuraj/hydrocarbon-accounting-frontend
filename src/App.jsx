@@ -45,6 +45,9 @@ import BargeTracking from './pages/BargeTracking'
 import TankerTransactionReport from './pages/TankerTransactionReport'
 import PrimeMoverTankerLinkMaster from './pages/PrimeMoverTankerLinkMaster'
 import TankerTracking from './pages/TankerTracking'
+import ShuttleTracking from './pages/ShuttleTracking'
+import VesselOperationMaster from './pages/VesselOperationMaster'
+import MovementMapping from './pages/MovementMapping'
 
 import { getCurrentUser, logoutUser } from './api/authApi'
 import { getLocationOperationAvailability } from './api/locationOperationAvailabilityApi'
@@ -699,7 +702,30 @@ function AppContent({
               </PermissionGuard>
             }
           />
-
+          <Route
+            path="/vessel-operations"
+            element={
+              <PermissionGuard
+                loggedInUser={loggedInUser}
+                requiredPermission="View Vessel Operation"
+                fallbackMessage="You do not have permission to view Vessel Operation Master."
+              >
+                <VesselOperationMaster locations={locations} assetTypes={assetTypes} />
+              </PermissionGuard>
+            }
+          />
+          <Route
+            path="/movement-mappings"
+            element={
+              <PermissionGuard
+                loggedInUser={loggedInUser}
+                requiredPermission="View Movement Mapping"
+                fallbackMessage="You do not have permission to view Movement Mapping."
+              >
+                <MovementMapping locations={locations} />
+              </PermissionGuard>
+            }
+          />
           <Route
             path="/operation-templates"
             element={
@@ -775,6 +801,23 @@ function AppContent({
                   locations={locations}
                   assets={assets}
                   operationTypes={operationTypes}
+                  operationTemplates={operationTemplates}
+                />
+              </PermissionGuard>
+            }
+          />
+          <Route
+            path="/shuttle-tracking"
+            element={
+              <PermissionGuard
+                loggedInUser={loggedInUser}
+                requiredPermission="View Shuttle Tracking"
+                fallbackMessage="You do not have permission to view Shuttle Tracking."
+              >
+                <ShuttleTracking
+                  loggedInUser={loggedInUser}
+                  locations={locations}
+                  assets={assets}
                   operationTemplates={operationTemplates}
                 />
               </PermissionGuard>

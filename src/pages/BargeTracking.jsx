@@ -24,6 +24,8 @@ function BargeTracking({ loggedInUser, assets = [], locations = [] }) {
     remarks: '',
   })
 
+  const [nextStageByAsset, setNextStageByAsset] = useState({})
+
 
   // Printable MTR-style Comparison Report
   const [printReport, setPrintReport] = useState({
@@ -44,28 +46,31 @@ function BargeTracking({ loggedInUser, assets = [], locations = [] }) {
   const tripStatus = String(timeline?.trip?.status || 'OPEN').toUpperCase()
   const isTripClosed = tripStatus === 'CLOSED'
 
+  const getComparisonAssetCode = (comparison) => {
+    return (
+      String(comparison.asset_code || '').trim() ||
+      String(comparison.summary_json?.asset_code || '').trim() ||
+      String(comparison.summary_json?.left?.asset_code || '').trim() ||
+      String(comparison.summary_json?.right?.asset_code || '').trim()
+    )
+  }
+
   const getPendingComparisonAssetCodes = () => {
     const assetCodes = (tracker?.assets || [])
-      .map((item) => String(item.asset_code || '').trim())
+      .map((g) => String(g.asset_code || '').trim())
       .filter(Boolean)
 
-    const comparisonAssetCodes = new Set(
-      (timeline?.comparisons || [])
-        .map((comparison) => {
-          return (
-            String(comparison.asset_code || '').trim() ||
-            String(comparison.assetCode || '').trim() ||
-            String(comparison.summary_json?.asset_code || '').trim()
-          )
-        })
-        .filter(Boolean)
+    const compared = new Set(
+      (timeline?.comparisons || []).map(getComparisonAssetCode).filter(Boolean)
     )
 
-    return assetCodes.filter((assetCode) => !comparisonAssetCodes.has(assetCode))
+    return assetCodes.filter((ac) => !compared.has(ac))
   }
 
   const hasApprovedBargeComparison = () => {
-    return getPendingComparisonAssetCodes().length === 0
+    return (
+      (tracker?.assets || []).length > 0 && getPendingComparisonAssetCodes().length === 0
+    )
   }
 
   const canCloseBargeMovement = () => {
@@ -295,11 +300,9 @@ function BargeTracking({ loggedInUser, assets = [], locations = [] }) {
     if (!timeline?.trip?.id) return
 
     if (!hasApprovedBargeComparison()) {
-      const pendingAssets = getPendingComparisonAssetCodes()
-
       alert(
         'Barge movement can be closed only after comparison is available for every barge in this convoy.\n\n' +
-          `Pending barge(s): ${pendingAssets.join(', ')}`
+          `Pending barge(s): ${getPendingComparisonAssetCodes().join(', ')}`
       )
       return
     }
@@ -855,6 +858,21 @@ return (
                       </button>
                     )}
 
+                    <select
+                      value={nextStageByAsset[String(assetCode)] || 'UNLOAD'}
+                      onChange={(e) =>
+                        setNextStageByAsset((cur) => ({
+                          ...cur,
+                          [String(assetCode)]: e.target.value,
+                        }))
+                      }
+                      disabled={loading || isTripClosed}
+                    >
+                      <option value="UNLOAD">UNLOAD</option>
+                      <option value="LOAD_2_TOPUP">LOAD 2 TOP-UP</option>
+                      <option value="STS">STS</option>
+                    </select>
+
                     <button
                       type="button"
                       disabled={loading || isTripClosed}
@@ -867,18 +885,20 @@ return (
                           leftTicket?.origin_location_code ||
                           ''
 
+                        const stage = nextStageByAsset[String(assetCode)] || 'UNLOAD'
+
                         const url =
                           `/operation-entry?` +
                           `convoy_number=${encodeURIComponent(convoy)}` +
                           `&primary_asset_code=${encodeURIComponent(assetCode)}` +
                           `&origin_location_code=${encodeURIComponent(origin)}` +
-                          `&auto_event_type=UNLOAD` +
+                          `&barge_event_type=${encodeURIComponent(stage)}` +
                           (leftId ? `&left_ticket_id=${encodeURIComponent(leftId)}` : '')
 
                         navigate(url)
                       }}
                     >
-                      Create UNLOAD Ticket
+                      Create Ticket
                     </button>
 
                     {canManage && (

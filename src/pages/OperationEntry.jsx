@@ -11,8 +11,9 @@ import MultiTankBeforeAfterLayout from '../components/operationLayouts/MultiTank
 import TankerTruckLayout from '../components/operationLayouts/TankerTruckLayout'
 import TankerPayloadPreview from '../components/operationLayouts/TankerPayloadPreview'
 import { getTankerSenderReference } from '../api/tankerTrackingApi'
-
-
+import StockMovementLayout from '../components/operationLayouts/StockMovementLayout'
+import VesselCycleLayout from '../components/operationLayouts/VesselCycleLayout'
+import ShuttleTrackingLayout from '../components/operationLayouts/ShuttleTrackingLayout'
 
 function LayoutSummaryPanel({ selectedTemplate }) {
   if (!selectedTemplate) {
@@ -162,6 +163,8 @@ function OperationLayoutRenderer({
   selectedTemplate,
   selectedTemplateFields,
   selectedAsset,
+  assets = [],
+  locations = [],
   assetCalibrationTables,
   calibrationTemplates,
   handleValueChange,
@@ -232,33 +235,12 @@ function OperationLayoutRenderer({
   if (layoutType === 'Stock Movement') {
     return (
       <>
-        <LayoutPlaceholder
-          title="Stock Movement Layout"
-          description="Designed for FSO, storage, or stock movement operations using opening and closing stock values."
-          sections={[
-            {
-              title: 'Movement Details',
-              items: [
-                'Reference / shuttle number',
-                'Counterparty asset',
-                'Reference quantity',
-                'Product / cargo',
-              ],
-            },
-            {
-              title: 'Stock Details',
-              items: [
-                'Opening stock',
-                'Opening water',
-                'Closing stock',
-                'Closing water',
-              ],
-            },
-            {
-              title: 'Live Results',
-              items: ['Net stock', 'Net water', 'Variance', 'Warning status'],
-            },
-          ]}
+        <StockMovementLayout
+          entry={entry}
+          editId={editId}
+          selectedAsset={selectedAsset}
+          assets={assets}
+          handleValueChange={handleValueChange}
         />
 
         <OperationTemplateFields
@@ -267,6 +249,18 @@ function OperationLayoutRenderer({
           selectedTemplateFields={selectedTemplateFields}
           handleValueChange={handleValueChange}
           getInputType={getInputType}
+          excludedFieldCodes={[
+            'vessel_operation_code',
+            'movement_reference',
+            'reference_number',
+            'opening_stock',
+            'opening_water',
+            'closing_stock',
+            'closing_water',
+            'net_stock',
+            'net_water',
+            'net_nsv',
+          ]}
         />
       </>
     )
@@ -291,7 +285,7 @@ function OperationLayoutRenderer({
           selectedTemplateFields={selectedTemplateFields}
           handleValueChange={handleValueChange}
           getInputType={getInputType}
-          excludedFieldCodes={['multi_tank_payload']}
+          excludedFieldCodes={['multi_tank_payload', 'barge_event_type']}
         />
       </>
     )
@@ -300,33 +294,13 @@ function OperationLayoutRenderer({
   if (layoutType === 'Vessel Cycle') {
     return (
       <>
-        <LayoutPlaceholder
-          title="Vessel Cycle Layout"
-          description="Designed for vessel loading, sailing, STS, unloading and cycle completion workflow."
-          sections={[
-            {
-              title: 'Cycle Header',
-              items: [
-                'Vessel asset',
-                'Shuttle number',
-                'Cycle status',
-                'Current stage',
-              ],
-            },
-            {
-              title: 'Stages',
-              items: ['Loading', 'STS optional', 'Unloading', 'Completed'],
-            },
-            {
-              title: 'Cycle Results',
-              items: [
-                'Loaded quantity',
-                'STS quantity',
-                'Discharged quantity',
-                'Final balance',
-              ],
-            },
-          ]}
+        <VesselCycleLayout
+          entry={entry}
+          editId={editId}
+          selectedAsset={selectedAsset}
+          assets={assets}
+          locations={locations}
+          handleValueChange={handleValueChange}
         />
 
         <OperationTemplateFields
@@ -335,6 +309,38 @@ function OperationLayoutRenderer({
           selectedTemplateFields={selectedTemplateFields}
           handleValueChange={handleValueChange}
           getInputType={getInputType}
+          excludedFieldCodes={[
+            'vessel_operation_code',
+            'movement_reference',
+            'shuttle_number',
+            'reference_number',
+            'counterparty_asset_code',
+            'quantity_bbl',
+            'gross_qty_bbl',
+            'water_bbl',
+            'nsv_bbl',
+          ]}
+        />
+      </>
+    )
+  }
+
+  if (layoutType === 'Shuttle Tracking') {
+    return (
+      <>
+        <ShuttleTrackingLayout
+          entry={entry}
+          selectedAsset={selectedAsset}
+          handleValueChange={handleValueChange}
+        />
+
+        <OperationTemplateFields
+          entry={entry}
+          selectedTemplate={selectedTemplate}
+          selectedTemplateFields={selectedTemplateFields}
+          handleValueChange={handleValueChange}
+          getInputType={getInputType}
+          excludedFieldCodes={['shuttle_payload']}
         />
       </>
     )
@@ -484,6 +490,10 @@ function OperationEntry({
   const [tankerSenderReference, setTankerSenderReference] = useState(null)
   const [tankerSenderReferenceLoading, setTankerSenderReferenceLoading] =
     useState(false)
+  const [editableSearch, setEditableSearch] = useState('')
+  const [editableStatusFilter, setEditableStatusFilter] = useState('ALL') // ALL | Draft | Rejected
+  const [editablePage, setEditablePage] = useState(1)
+  const EDITABLE_PAGE_SIZE = 20
 
   const location = useLocation()
   const navigate = useNavigate()
@@ -686,6 +696,45 @@ function OperationEntry({
   const editableOperationEntries = operationEntries.filter((item) => {
     return item.status === 'Draft' || item.status === 'Rejected'
   })
+
+  const filteredEditableEntries = useMemo(() => {
+    const rows = [...(editableOperationEntries || [])]
+
+    const search = String(editableSearch || '').trim().toLowerCase()
+    const status = String(editableStatusFilter || 'ALL')
+
+    const filtered = rows.filter((item) => {
+      if (status !== 'ALL' && String(item.status || '') !== status) return false
+
+      if (!search) return true
+
+      const blob = `${item.operationNumber} ${item.operationTypeName} ${item.operationTemplateName} ${item.primaryAssetName} ${item.primaryAssetCode} ${item.originLocationName} ${item.originLocationCode} ${item.operationDate} ${item.productName} ${item.status}`.toLowerCase()
+
+      return blob.includes(search)
+    })
+
+    filtered.sort((a, b) => {
+      const da = String(a.operationDate || '')
+      const db = String(b.operationDate || '')
+      if (da !== db) return db.localeCompare(da)
+      return Number(b.id || 0) - Number(a.id || 0)
+    })
+
+    return filtered
+  }, [editableOperationEntries, editableSearch, editableStatusFilter])
+
+  const editableTotalPages = useMemo(() => {
+    return Math.max(1, Math.ceil(filteredEditableEntries.length / EDITABLE_PAGE_SIZE))
+  }, [filteredEditableEntries.length])
+
+  const pagedEditableEntries = useMemo(() => {
+    const start = (editablePage - 1) * EDITABLE_PAGE_SIZE
+    return filteredEditableEntries.slice(start, start + EDITABLE_PAGE_SIZE)
+  }, [filteredEditableEntries, editablePage])
+
+  useEffect(() => {
+    setEditablePage(1)
+  }, [editableSearch, editableStatusFilter])
 
   const initializeValuesFromTemplate = (templateId) => {
     const template = activeOperationTemplates.find((item) => {
@@ -974,12 +1023,17 @@ function OperationEntry({
     const selectedLayoutType = String(selectedTemplate?.entryLayoutType || '')
       .toLowerCase()
 
-    const needsConvoyNumber =
-      selectedLayoutType.includes('multi-tank') ||
-      selectedLayoutType.includes('tanker')
+    const isMultiTank = selectedLayoutType.includes('multi-tank')
+    const isTanker = selectedLayoutType.includes('tanker')
+    const isShuttleTracking = selectedLayoutType.includes('shuttle tracking')
 
-    if (needsConvoyNumber && entry.convoyNumber.trim() === '') {
+    if ((isMultiTank || isTanker) && entry.convoyNumber.trim() === '') {
       alert('Convoy Number is required for Multi-Tank / Tanker operations')
+      return
+    }
+
+    if (isShuttleTracking && entry.convoyNumber.trim() === '') {
+      alert('Shuttle Number is required for Shuttle Tracking')
       return
     }
     if (entry.originLocationCode.trim() === '') {
@@ -1045,6 +1099,14 @@ function OperationEntry({
       const hasTankerPayload = (entry.values || []).some((v) => v.fieldCode === 'tanker_payload')
       if (!hasTankerPayload) {
         alert('Template setup required: Add System field "tanker_payload" in Operation Template.')
+        return
+      }
+    }
+
+    if (layoutType === 'Shuttle Tracking') {
+      const hasShuttlePayload = (entry.values || []).some((v) => v.fieldCode === 'shuttle_payload')
+      if (!hasShuttlePayload) {
+        alert('Template setup required: Add System field "shuttle_payload" in Operation Template.')
         return
       }
     }
@@ -1152,6 +1214,17 @@ function OperationEntry({
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  const handleCloseEdit = () => {
+    const ok = window.confirm(
+      'Close editing window?\n\nAny unsaved changes will be lost.'
+    )
+    if (!ok) return
+
+    setEntry(emptyEntry)
+    setEditId(null)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   const handleDelete = async (entryId) => {
     const confirmDelete = window.confirm(
       'Are you sure you want to cancel this Draft/Rejected operation entry? This will preserve the audit history.'
@@ -1193,7 +1266,17 @@ function OperationEntry({
   }
   const showConvoyNumber = (() => {
     const layout = String(selectedTemplate?.entryLayoutType || '').toLowerCase()
-    return layout.includes('multi-tank') || layout.includes('tanker')
+    return (
+      layout.includes('multi-tank') ||
+      layout.includes('tanker') ||
+      layout.includes('shuttle tracking')
+    )
+  })()
+
+  const convoyLabel = (() => {
+    const layout = String(selectedTemplate?.entryLayoutType || '').toLowerCase()
+    if (layout.includes('shuttle tracking')) return 'Shuttle Number'
+    return 'Convoy Number'
   })()
 
   return (
@@ -1208,7 +1291,7 @@ function OperationEntry({
         </div>
 
         <span className="record-count">
-          {editableOperationEntries.length} Editable Entries
+          {filteredEditableEntries.length} Editable Entries
         </span>
       </div>
 
@@ -1304,7 +1387,7 @@ function OperationEntry({
         </div>
         {showConvoyNumber && (
           <div>
-            <label>Convoy Number *</label>
+            <label>{convoyLabel} *</label>
             <input
               name="convoyNumber"
               type="text"
@@ -1468,6 +1551,8 @@ function OperationEntry({
           selectedTemplate={selectedTemplate}
           selectedTemplateFields={selectedTemplateFields}
           selectedAsset={selectedAsset}
+          assets={assets}
+          locations={locations}
           assetCalibrationTables={assetCalibrationTables}
           calibrationTemplates={calibrationTemplates}
           handleValueChange={handleValueChange}
@@ -1479,16 +1564,12 @@ function OperationEntry({
 
         <div className="form-actions">
           <button type="submit" disabled={loading}>
-            {loading
-              ? 'Please wait...'
-              : editId === null
-                ? 'Save Operation Entry'
-                : 'Update Operation Entry'}
+            {loading ? 'Saving...' : editId === null ? 'Save Draft' : 'Update Draft'}
           </button>
 
           {editId !== null && (
-            <button type="button" onClick={handleCancelEdit} disabled={loading}>
-              Cancel Edit
+            <button type="button" onClick={handleCloseEdit} disabled={loading}>
+              Close Edit
             </button>
           )}
         </div>
@@ -1501,6 +1582,66 @@ function OperationEntry({
           be recalled to Draft before editing. Approved and Cancelled tickets are
           locked.
         </p>
+      </div>
+
+      <div className="info-box">
+        <div
+          style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}
+        >
+          <div style={{ minWidth: 200 }}>
+            <label style={{ display: 'block', fontSize: 12, opacity: 0.8 }}>
+              Status
+            </label>
+            <select
+              value={editableStatusFilter}
+              onChange={(e) => setEditableStatusFilter(e.target.value)}
+            >
+              <option value="ALL">All</option>
+              <option value="Draft">Draft</option>
+              <option value="Rejected">Rejected</option>
+            </select>
+          </div>
+
+          <div style={{ flex: 1, minWidth: 280 }}>
+            <label style={{ display: 'block', fontSize: 12, opacity: 0.8 }}>
+              Search
+            </label>
+            <input
+              value={editableSearch}
+              onChange={(e) => setEditableSearch(e.target.value)}
+              placeholder="Search ticket / asset / origin / template / product..."
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, alignItems: 'end' }}>
+            <button
+              type="button"
+              disabled={editablePage <= 1}
+              onClick={() => setEditablePage((p) => Math.max(1, p - 1))}
+            >
+              Prev
+            </button>
+
+            <span style={{ alignSelf: 'center' }}>
+              Page {editablePage} / {editableTotalPages}
+            </span>
+
+            <button
+              type="button"
+              disabled={editablePage >= editableTotalPages}
+              onClick={() =>
+                setEditablePage((p) => Math.min(editableTotalPages, p + 1))
+              }
+            >
+              Next
+            </button>
+          </div>
+        </div>
+
+        <div style={{ marginTop: 6, fontSize: 12, opacity: 0.75 }}>
+          Showing {pagedEditableEntries.length} of {filteredEditableEntries.length}{' '}
+          editable entries
+        </div>
       </div>
 
       <table>
@@ -1520,14 +1661,14 @@ function OperationEntry({
         </thead>
 
         <tbody>
-          {editableOperationEntries.length === 0 ? (
+          {pagedEditableEntries.length === 0 ? (
             <tr>
               <td colSpan="10" className="empty-table">
                 No Draft or Rejected operation entries available for editing.
               </td>
             </tr>
           ) : (
-            editableOperationEntries.map((item) => (
+            pagedEditableEntries.map((item) => (
               <tr key={item.id}>
                 <td>{item.operationNumber}</td>
                 <td>{item.operationTypeName}</td>

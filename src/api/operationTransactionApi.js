@@ -1,4 +1,4 @@
-﻿import { apiGet, apiPatch } from './apiClient'
+import { apiGet, apiPatch } from './apiClient'
 import { getStoredAccessToken } from './authApi'
 
 const convertOperationTransactionFromApi = (item) => {
@@ -104,6 +104,27 @@ export const getOperationTransactions = async (filters = {}) => {
   return data.map(convertOperationTransactionFromApi)
 }
 
+export const getOperationTransactionsPaged = async (filters = {}) => {
+  const queryParams = new URLSearchParams()
+
+  if (filters.dateFrom) queryParams.append('date_from', filters.dateFrom)
+  if (filters.dateTo) queryParams.append('date_to', filters.dateTo)
+  if (filters.operationTypeId) queryParams.append('operation_type_id', filters.operationTypeId)
+  if (filters.operationTypeCode) queryParams.append('operation_type_code', filters.operationTypeCode)
+  if (filters.locationId) queryParams.append('location_id', filters.locationId)
+  if (filters.locationCode) queryParams.append('location_code', filters.locationCode)
+  if (filters.assetId) queryParams.append('asset_id', filters.assetId)
+  if (filters.assetCode) queryParams.append('asset_code', filters.assetCode)
+  if (filters.status) queryParams.append('status', filters.status)
+  if (filters.searchText) queryParams.append('search', filters.searchText)
+
+  queryParams.append('page', String(filters.page || 1))
+  queryParams.append('page_size', String(filters.pageSize || 20))
+
+  const path = `/operation-transactions/paged?${queryParams.toString()}`
+  return apiGet(path)
+}
+
 export const getOperationTransactionDetail = async (transactionId) => {
   const data = await apiGet(`/operation-transactions/${transactionId}`)
   return convertOperationTransactionDetailFromApi(data)
@@ -112,11 +133,13 @@ export const getOperationTransactionDetail = async (transactionId) => {
 export const updateOperationTransactionStatus = async (
   transactionId,
   status,
-  remarks = ''
+  remarks = '',
+  reviewConfirmed = false
 ) => {
   return apiPatch(`/operation-transactions/${transactionId}/status`, {
     status,
     remarks,
+    review_confirmed: Boolean(reviewConfirmed),
   })
 }
 

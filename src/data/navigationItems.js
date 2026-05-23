@@ -124,6 +124,18 @@ export const navigationItems = [
         permission: 'View Tank Operation',
       },
       {
+        label: 'Vessel Operation Master',
+        path: '/vessel-operations',
+        disabled: false,
+        permission: 'View Vessel Operation',
+      },
+      {
+        label: 'Movement Mapping',
+        path: '/movement-mappings',
+        disabled: false,
+        permission: 'View Movement Mapping',
+      },
+      {
         label: 'Location Operation Availability',
         path: '/location-operation-availability',
         disabled: false,
@@ -152,6 +164,12 @@ export const navigationItems = [
         path: '/tanker-tracking',
         disabled: false,
         permission: 'View Operation Transaction',
+      },
+      {
+        label: 'Shuttle Tracking',
+        path: '/shuttle-tracking',
+        disabled: false,
+        permission: 'View Shuttle Tracking',
       },
       {
         label: 'Operation Transaction Register',

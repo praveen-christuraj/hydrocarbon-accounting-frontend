@@ -4082,3 +4082,303 @@ textarea:focus {
     margin: 5mm;
   }
 }
+/* -----------------------------
+   Shuttle Tracking: Compact UI
+------------------------------ */
+
+.compact-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.compact-toolbar-left {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.compact-toolbar-right {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.compact-row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+@media (max-width: 1100px) {
+  .compact-row-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.compact-card {
+  margin: 0;
+  padding: 10px;
+}
+
+.dense-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(140px, 1fr));
+  gap: 8px;
+  align-items: end;
+}
+
+@media (max-width: 1400px) {
+  .dense-grid {
+    grid-template-columns: repeat(3, minmax(160px, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .dense-grid {
+    grid-template-columns: repeat(2, minmax(160px, 1fr));
+  }
+}
+
+.dense-grid label {
+  font-size: 12px;
+  opacity: 0.8;
+  margin-bottom: 2px;
+}
+
+.dense-grid input,
+.dense-grid select,
+.dense-grid textarea {
+  padding: 6px 8px;
+}
+
+.dense-table th,
+.dense-table td {
+  padding: 6px 8px;
+}
+
+.sticky-right-header {
+  position: sticky;
+  top: 10px;
+  z-index: 2;
+}
+/* Shuttle Tracking summary: compact + no overlap */
+.summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed; /* prevents weird overflow */
+}
+
+.summary-table th,
+.summary-table td {
+  padding: 6px 8px;
+  font-size: 12px;
+  vertical-align: middle;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.summary-table th {
+  opacity: 0.85;
+  font-weight: 600;
+}
+
+.summary-table td {
+  background: #fff;
+  border-radius: 6px;
+}
+
+.stage-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.stage-wrap button {
+  padding: 6px 10px;
+  font-size: 12px;
+}
+/* Shuttle Tracking: compact expanded ticket details */
+.ticket-details-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.ticket-details-table th,
+.ticket-details-table td {
+  padding: 6px 8px;
+  font-size: 12px;
+  vertical-align: middle;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ticket-details-table th {
+  opacity: 0.85;
+  font-weight: 600;
+}
+
+.ticket-details-row {
+  background: #fff;
+  border-radius: 6px;
+}
+
+.ticket-details-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+/* ============================
+   A4 Print Layout (Shuttle)
+============================ */
+
+.print-only {
+  display: none;
+}
+
+@media print {
+  /* Hide the app chrome */
+  .topbar,
+  .no-print,
+  .page-title,
+  .info-box:not(.print-only-card),
+  .two-column-grid,
+  button {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+    color: #000 !important;
+  }
+
+  .main-content {
+    padding: 0 !important;
+  }
+
+  .main-content > div {
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Show print section only */
+  .print-only {
+    display: block !important;
+  }
+
+  /* A4 page settings */
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
+  .print-report {
+    font-size: 10px;
+  }
+
+  .print-report h1 {
+    font-size: 14px;
+    margin: 0 0 6px 0;
+  }
+
+  .print-report h2 {
+    font-size: 12px;
+    margin: 10px 0 6px 0;
+  }
+
+  .print-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 6px;
+    font-size: 10px;
+  }
+
+  .print-meta div {
+    min-width: 180px;
+  }
+
+  .print-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+
+  .print-table th,
+  .print-table td {
+    border: 1px solid #000;
+    padding: 3px 4px;
+    vertical-align: top;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .print-table th {
+    font-weight: 700;
+  }
+
+  .print-note {
+    margin-top: 6px;
+    font-size: 9px;
+  }
+}
+/* Shuttle create form: pair fields in 2 columns */
+.pair-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+@media (max-width: 900px) {
+  .pair-2col {
+    grid-template-columns: 1fr;
+  }
+}
+/* Shuttle Create Ticket: fixed 2-column clean grid */
+.create-2col-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 12px; /* row-gap col-gap */
+  align-items: end;
+}
+
+.create-2col-grid label {
+  font-size: 12px;
+  opacity: 0.85;
+  margin-bottom: 2px;
+  display: block;
+}
+
+.create-2col-grid input,
+.create-2col-grid select,
+.create-2col-grid textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Span full width rows */
+.create-2col-grid .full-width {
+  grid-column: 1 / -1;
+}
+
+/* On mobile: stack */
+@media (max-width: 900px) {
+  .create-2col-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .create-2col-grid .full-width {
+    grid-column: 1;
+  }
+}
