@@ -19,26 +19,22 @@ const convertTicketFromApi = (t) => {
     locationCode: t.location_code || '',
     locationName: t.location_name || '',
     shuttleNumber: t.shuttle_number || '',
-    shuttleAssetCode: t.shuttle_asset_code || '',
-    shuttleAssetName: t.shuttle_asset_name || '',
+    fsoAssetCode: t.fso_asset_code || '',
+    fsoAssetName: t.fso_asset_name || '',
     productName: t.product_name || '',
     operationDate: t.operation_date || '',
     eventTime: t.event_time || '',
+    operationLabel: t.operation_label || '',
+    vesselName: t.vessel_name || '',
+    vesselQuantityBbl: Number(t.vessel_quantity_bbl || 0),
     openingStockBbl: Number(t.opening_stock_bbl || 0),
     openingWaterBbl: Number(t.opening_water_bbl || 0),
     closingStockBbl: Number(t.closing_stock_bbl || 0),
     closingWaterBbl: Number(t.closing_water_bbl || 0),
     netStockBbl: Number(t.net_stock_bbl || 0),
     netWaterBbl: Number(t.net_water_bbl || 0),
-    bargeReference: t.barge_reference || '',
+    varianceBbl: Number(t.variance_bbl || 0),
     remarks: t.remarks || '',
-    vesselOperationCode: t.vessel_operation_code || '',
-    vesselOperationLabel: t.vessel_operation_label || '',
-    vesselOperationCategory: t.vessel_operation_category || '',
-    vesselOperationSign: t.vessel_operation_sign || '',
-    tovBbl: Number(t.tov_bbl || 0),
-    freeWaterBbl: Number(t.free_water_bbl || 0),
-    nsvBbl: Number(t.nsv_bbl || 0),
     status: t.status || '',
     createdBy: t.created_by || '',
     createdAt: t.created_at || '',
@@ -51,22 +47,27 @@ const convertGroupFromApi = (g) => ({
   locationCode: g.location_code || '',
   locationName: g.location_name || '',
   shuttleNumber: g.shuttle_number || '',
-  shuttleAssetCode: g.shuttle_asset_code || '',
-  shuttleAssetName: g.shuttle_asset_name || '',
+  fsoAssetCode: g.fso_asset_code || '',
+  fsoAssetName: g.fso_asset_name || '',
   voyageStatus: g.voyage_status || 'OPEN',
   closedBy: g.closed_by || '',
   closedAt: g.closed_at || '',
   closureRemarks: g.closure_remarks || '',
-  totalTovBbl: Number(g.total_tov_bbl || 0),
-  totalFreeWaterBbl: Number(g.total_free_water_bbl || 0),
-  totalNsvBbl: Number(g.total_nsv_bbl || 0),
-  netReceiptBbl: Number(g.net_receipt_bbl || 0),
-  netDischargeBbl: Number(g.net_discharge_bbl || 0),
+  totalReceiptsBbl: Number(g.total_receipts_bbl || 0),
+  totalExportsBbl: Number(g.total_exports_bbl || 0),
+  totalWaterInBbl: Number(g.total_water_in_bbl || 0),
+  totalWaterOutBbl: Number(g.total_water_out_bbl || 0),
+  netWaterBbl: Number(g.net_water_bbl || 0),
+  lossGainBbl: Number(g.loss_gain_bbl || 0),
+  totalVarianceBbl: Number(g.total_variance_bbl || 0),
+  shuttleDischargeBbl: Number(g.shuttle_discharge_bbl || 0),
+  fsoReceiptBbl: Number(g.fso_receipt_bbl || 0),
+  varianceBbl: Number(g.variance_bbl || 0),
   tickets: (g.tickets || []).map(convertTicketFromApi).filter(Boolean),
 })
 
-export const getShuttleTracking = async (filters = {}) => {
-  const data = await apiGet(`/shuttle-tracking${buildQueryString(filters)}`)
+export const getFSOTracking = async (filters = {}) => {
+  const data = await apiGet(`/fso-tracking${buildQueryString(filters)}`)
   return {
     rows: (data.rows || []).map(convertGroupFromApi),
     totalGroups: Number(data.total_groups || 0),
@@ -76,16 +77,16 @@ export const getShuttleTracking = async (filters = {}) => {
   }
 }
 
-export const closeShuttleVoyage = async ({
+export const closeFSOVoyage = async ({
   locationCode,
   shuttleNumber,
-  shuttleAssetCode,
+  fsoAssetCode,
   closureRemarks,
 }) => {
-  return apiPost('/shuttle-voyages/close', {
+  return apiPost('/fso-voyages/close', {
     location_code: locationCode,
     shuttle_number: shuttleNumber,
-    shuttle_asset_code: shuttleAssetCode,
+    fso_asset_code: fsoAssetCode,
     closure_remarks:
       closureRemarks && String(closureRemarks).trim() !== ''
         ? String(closureRemarks).trim()
@@ -93,52 +94,16 @@ export const closeShuttleVoyage = async ({
   })
 }
 
-export const reopenShuttleVoyage = async ({
+export const reopenFSOVoyage = async ({
   locationCode,
   shuttleNumber,
-  shuttleAssetCode,
+  fsoAssetCode,
   remarks,
 }) => {
-  return apiPost('/shuttle-voyages/reopen', {
+  return apiPost('/fso-voyages/reopen', {
     location_code: locationCode,
     shuttle_number: shuttleNumber,
-    shuttle_asset_code: shuttleAssetCode,
+    fso_asset_code: fsoAssetCode,
     remarks: remarks && String(remarks).trim() !== '' ? String(remarks).trim() : null,
   })
-}
-
-const API_BASE_URL = 'http://127.0.0.1:8000'
-const TOKEN_STORAGE_KEYS = [
-  'hydrocarbonAccessToken',
-  'hydrocarbon_access_token',
-  'access_token',
-  'accessToken',
-]
-
-const getStoredAuthToken = () => {
-  for (const key of TOKEN_STORAGE_KEYS) {
-    const token = localStorage.getItem(key)
-    if (token && token.trim() !== '') return token.trim()
-  }
-  return ''
-}
-
-export const downloadShuttleVoyageXlsx = async ({ group_key }) => {
-  const token = getStoredAuthToken()
-  const url = `${API_BASE_URL}/shuttle-tracking/export/xlsx?group_key=${encodeURIComponent(group_key)}`
-  const res = await fetch(url, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  })
-  if (!res.ok) {
-    const text = await res.text()
-    throw new Error(text || 'Download failed')
-  }
-  const blob = await res.blob()
-  const a = document.createElement('a')
-  a.href = URL.createObjectURL(blob)
-  a.download = 'shuttle_mtr.xlsx'
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(a.href)
 }

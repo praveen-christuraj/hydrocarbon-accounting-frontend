@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react'
-import * as XLSX from 'xlsx'
 import {
   createAssetCalibrationTable,
   deleteAssetCalibrationTable,
@@ -377,8 +376,8 @@ function AssetCalibrationTable({
     const fileName = selectedFile.name
     const fileExtension = fileName.split('.').pop().toLowerCase()
 
-    if (fileExtension !== 'xlsx' && fileExtension !== 'csv') {
-      alert('Only XLSX and CSV files are allowed')
+    if (fileExtension !== 'csv') {
+      alert('XLSX upload disabled. Upload CSV.')
       e.target.value = ''
       return
     }
@@ -386,25 +385,8 @@ function AssetCalibrationTable({
     try {
       let rawRows = []
 
-      if (fileExtension === 'csv') {
-        const csvText = await selectedFile.text()
-        rawRows = parseCsvText(csvText)
-      } else {
-        const arrayBuffer = await selectedFile.arrayBuffer()
-        const workbook = XLSX.read(arrayBuffer, { type: 'array' })
-        const firstSheetName = workbook.SheetNames[0]
-
-        if (!firstSheetName) {
-          throw new Error('Uploaded XLSX file does not contain any sheet')
-        }
-
-        const worksheet = workbook.Sheets[firstSheetName]
-
-        rawRows = XLSX.utils.sheet_to_json(worksheet, {
-          defval: '',
-          raw: false,
-        })
-      }
+      const csvText = await selectedFile.text()
+      rawRows = parseCsvText(csvText)
 
       const validationResult = validateAndNormalizeUploadedRows(rawRows)
 
@@ -587,7 +569,7 @@ function AssetCalibrationTable({
         <div className="help-modal-overlay">
           <div className="help-modal">
             <div className="help-modal-header">
-              <h3>XLSX / CSV Upload Help</h3>
+              <h3>CSV Upload Help</h3>
 
               <button
                 type="button"
@@ -607,15 +589,15 @@ function AssetCalibrationTable({
               <div className="help-section">
                 <h4>Column Header Rule</h4>
                 <p>
-                  The first row of your Excel or CSV file must contain column
-                  names. These names must match the template column names.
+                  The first row of your CSV file must contain column names.
+                  These names must match the template column names.
                 </p>
 
                 <table>
                   <thead>
                     <tr>
                       <th>Template Column</th>
-                      <th>Excel / CSV Header</th>
+                      <th>CSV Header</th>
                       <th>Allowed?</th>
                     </tr>
                   </thead>
@@ -660,7 +642,7 @@ function AssetCalibrationTable({
                 <h4>Validations Applied</h4>
 
                 <ul>
-                  <li>Only .xlsx and .csv files are allowed.</li>
+                  <li>Only .csv files are allowed.</li>
                   <li>Asset and Calibration Template must be selected first.</li>
                   <li>All template columns must exist in the uploaded file.</li>
                   <li>Required columns cannot be blank.</li>
@@ -796,7 +778,7 @@ function AssetCalibrationTable({
             <div className="full-width-field">
               <div className="section-title compact-section-title">
                 <div className="title-with-help">
-                  <h3>Upload XLSX / CSV</h3>
+                  <h3>Upload CSV</h3>
 
                   <button
                     type="button"
@@ -819,7 +801,7 @@ function AssetCalibrationTable({
               <label>Upload Calibration File</label>
               <input
                 type="file"
-                accept=".xlsx,.csv"
+                accept=".csv"
                 onChange={handleFileUpload}
                 disabled={loading}
               />
@@ -1088,7 +1070,7 @@ function AssetCalibrationTable({
       </table>
 
       <div className="info-box">
-        XLSX/CSV headers must match the selected calibration template columns.
+        CSV headers must match the selected calibration template columns.
         Parsed rows are saved into PostgreSQL JSONB.
       </div>
     </div>

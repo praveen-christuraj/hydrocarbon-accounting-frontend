@@ -14,6 +14,7 @@ import { getTankerSenderReference } from '../api/tankerTrackingApi'
 import StockMovementLayout from '../components/operationLayouts/StockMovementLayout'
 import VesselCycleLayout from '../components/operationLayouts/VesselCycleLayout'
 import ShuttleTrackingLayout from '../components/operationLayouts/ShuttleTrackingLayout'
+import FSOTrackingLayout from '../components/operationLayouts/FSOTrackingLayout.jsx'
 
 function LayoutSummaryPanel({ selectedTemplate }) {
   if (!selectedTemplate) {
@@ -172,6 +173,7 @@ function OperationLayoutRenderer({
   senderReference = null,
   senderReferenceLoading = false,
   receiverMode = false,
+  setEntryField,
 }) {
   if (!selectedTemplate) {
     return (
@@ -346,6 +348,28 @@ function OperationLayoutRenderer({
     )
   }
 
+  if (layoutType === 'FSO Tracking') {
+    return (
+      <>
+        <FSOTrackingLayout
+          entry={entry}
+          selectedAsset={selectedAsset}
+          handleValueChange={handleValueChange}
+          setEntryField={setEntryField}
+        />
+
+        <OperationTemplateFields
+          entry={entry}
+          selectedTemplate={selectedTemplate}
+          selectedTemplateFields={selectedTemplateFields}
+          handleValueChange={handleValueChange}
+          getInputType={getInputType}
+          excludedFieldCodes={['fso_payload']}
+        />
+      </>
+    )
+  }
+
     const hasTankerPayloadField = entry.values.some((value) => {
       return value.fieldCode === 'tanker_payload'
     })
@@ -485,6 +509,14 @@ function OperationEntry({
   }
 
   const [entry, setEntry] = useState(emptyEntry)
+
+  const setEntryField = (field, value) => {
+    setEntry((prev) => ({
+      ...prev,
+      [field]: value,
+    }))
+  }
+
   const [editId, setEditId] = useState(null)
   const [loading, setLoading] = useState(false)
   const [tankerSenderReference, setTankerSenderReference] = useState(null)
@@ -1264,14 +1296,15 @@ function OperationEntry({
     setEntry(emptyEntry)
     setEditId(null)
   }
-  const showConvoyNumber = (() => {
+  const showConvoyNumber = useMemo(() => {
     const layout = String(selectedTemplate?.entryLayoutType || '').toLowerCase()
+
     return (
       layout.includes('multi-tank') ||
       layout.includes('tanker') ||
       layout.includes('shuttle tracking')
     )
-  })()
+  }, [selectedTemplate])
 
   const convoyLabel = (() => {
     const layout = String(selectedTemplate?.entryLayoutType || '').toLowerCase()
@@ -1560,6 +1593,7 @@ function OperationEntry({
           senderReference={tankerSenderReference}
           senderReferenceLoading={tankerSenderReferenceLoading}
           receiverMode={prefill.mode === 'tanker-receiver'}
+          setEntryField={setEntryField}
         />
 
         <div className="form-actions">

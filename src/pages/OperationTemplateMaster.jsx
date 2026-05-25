@@ -419,6 +419,7 @@ function OperationTemplateMaster({
             <option>Tanker Loading</option>
             <option>Vessel Cycle</option>
             <option>Shuttle Tracking</option> {/* ✅ NEW */}
+            <option>FSO Tracking</option> {/* ✅ NEW */}
             <option>Stock Movement</option>
             <option>Meter Reading</option>
           </select>

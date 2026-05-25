@@ -46,6 +46,9 @@ import TankerTransactionReport from './pages/TankerTransactionReport'
 import PrimeMoverTankerLinkMaster from './pages/PrimeMoverTankerLinkMaster'
 import TankerTracking from './pages/TankerTracking'
 import ShuttleTracking from './pages/ShuttleTracking'
+import FSOTracking from './pages/FSOTracking'
+import Dashboard from './pages/Dashboard'
+import DashboardBuilder from './pages/DashboardBuilder'
 import VesselOperationMaster from './pages/VesselOperationMaster'
 import MovementMapping from './pages/MovementMapping'
 
@@ -819,6 +822,52 @@ function AppContent({
                   locations={locations}
                   assets={assets}
                   operationTemplates={operationTemplates}
+                />
+              </PermissionGuard>
+            }
+          />
+          <Route
+            path="/fso-tracking"
+            element={
+              <PermissionGuard
+                loggedInUser={loggedInUser}
+                requiredPermission="View FSO Tracking"
+                fallbackMessage="You do not have permission to view FSO Tracking."
+              >
+                <FSOTracking
+                  locations={locations}
+                  assets={assets}
+                  operationTemplates={operationTemplates}
+                  loggedInUser={loggedInUser}
+                />
+              </PermissionGuard>
+            }
+          />
+          <Route
+            path="/dashboard"
+            element={
+              <PermissionGuard
+                loggedInUser={loggedInUser}
+                requiredPermission="View Dashboard"
+                fallbackMessage="You do not have permission to view Dashboard."
+              >
+                <Dashboard locations={locations} />
+              </PermissionGuard>
+            }
+          />
+          <Route
+            path="/dashboard-builder"
+            element={
+              <PermissionGuard
+                loggedInUser={loggedInUser}
+                requiredPermission="Manage Dashboard"
+                fallbackMessage="You do not have permission to manage dashboard."
+              >
+                <DashboardBuilder
+                  locations={locations}
+                  assets={assets}
+                  operationTypes={operationTypes}
+                  locationOperationAvailability={locationOperationAvailability}
                 />
               </PermissionGuard>
             }

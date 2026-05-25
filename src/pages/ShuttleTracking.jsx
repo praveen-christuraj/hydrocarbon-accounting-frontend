@@ -4,6 +4,7 @@ import {
   getShuttleTracking,
   closeShuttleVoyage,
   reopenShuttleVoyage,
+  downloadShuttleVoyageXlsx,
 } from '../api/shuttleTrackingApi'
 import { createOperationEntry } from '../api/operationEntryApi'
 import { getVesselOperations } from '../api/vesselOperationApi'
@@ -425,16 +426,20 @@ function ShuttleTracking({
   // ----------------------------
   const voyageSummary = useMemo(() => {
     if (!selectedGroup) return null
+
     const tickets = [...(sortedSelectedTickets || [])]
     const last = tickets.length ? tickets[tickets.length - 1] : null
+
+    const isClosed = String(selectedGroup.voyageStatus || '').toUpperCase() === 'CLOSED'
 
     return {
       status: String(selectedGroup.voyageStatus || 'OPEN'),
       ticketCount: tickets.length,
       lastClosingStock: last ? Number(last.closingStockBbl || 0) : 0,
       lastClosingWater: last ? Number(last.closingWaterBbl || 0) : 0,
-      totalNetStock: Number(selectedGroup.totalNsvBbl || 0),
-      totalNetWater: Number(selectedGroup.totalFreeWaterBbl || 0),
+
+      isClosed,
+      netDischargeBbl: Number(selectedGroup.netDischargeBbl || 0),
     }
   }, [selectedGroup, sortedSelectedTickets])
 
@@ -623,79 +628,20 @@ function ShuttleTracking({
     URL.revokeObjectURL(url)
   }
 
-  const exportExcelForSelected = () => {
+  const exportExcelForSelected = async () => {
     if (!selectedGroup) {
       alert('Select a voyage first')
       return
     }
 
-    const rows = sortedSelectedTickets
-
-    const rowsHtml = rows
-      .map((t) => {
-        return `
-          <tr>
-            <td>${t.ticketNumber || ''}</td>
-            <td>${t.operationNumber || ''}</td>
-            <td>${t.locationCode || ''}</td>
-            <td>${t.locationName || ''}</td>
-            <td>${t.shuttleNumber || ''}</td>
-            <td>${t.shuttleAssetCode || ''}</td>
-            <td>${t.shuttleAssetName || ''}</td>
-            <td>${t.operationDate || ''}</td>
-            <td>${t.eventTime || ''}</td>
-            <td>${t.vesselOperationLabel || ''}</td>
-            <td>${Number(t.openingStockBbl || 0).toFixed(3)}</td>
-            <td>${Number(t.openingWaterBbl || 0).toFixed(3)}</td>
-            <td>${Number(t.closingStockBbl || 0).toFixed(3)}</td>
-            <td>${Number(t.closingWaterBbl || 0).toFixed(3)}</td>
-            <td>${Number(t.netStockBbl || 0).toFixed(3)}</td>
-            <td>${Number(t.netWaterBbl || 0).toFixed(3)}</td>
-            <td>${t.remarks || ''}</td>
-            <td>${t.status || ''}</td>
-          </tr>
-        `
-      })
-      .join('')
-
-    const html = `
-      <table border="1">
-        <thead>
-          <tr>
-            <th>Ticket Number</th>
-            <th>Operation Number</th>
-            <th>Location Code</th>
-            <th>Location Name</th>
-            <th>Shuttle Number</th>
-            <th>Shuttle Asset Code</th>
-            <th>Shuttle Asset Name</th>
-            <th>Operation Date</th>
-            <th>Operation Time</th>
-            <th>Operation</th>
-            <th>Opening Stock</th>
-            <th>Opening Water</th>
-            <th>Closing Stock</th>
-            <th>Closing Water</th>
-            <th>Net Stock</th>
-            <th>Net Water</th>
-            <th>Remarks</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>${rowsHtml}</tbody>
-      </table>
-    `
-
-    const blob = new Blob([html], { type: 'application/vnd.ms-excel' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-
-    const today = new Date().toISOString().slice(0, 10)
-    link.href = url
-    link.download = `shuttle-tracking-${selectedGroup.locationCode}-${selectedGroup.shuttleAssetCode}-${selectedGroup.shuttleNumber}-${today}.xls`
-    link.click()
-
-    URL.revokeObjectURL(url)
+    try {
+      setLoading(true)
+      await downloadShuttleVoyageXlsx({ group_key: selectedGroup.groupKey })
+    } catch (e) {
+      alert(e.message || 'Unable to export excel')
+    } finally {
+      setLoading(false)
+    }
   }
 
   // ----------------------------
@@ -881,7 +827,82 @@ function ShuttleTracking({
   // ----------------------------
   return (
     <>
-      <div>
+      <div className="print-only mtr-page">
+        {selectedGroup ? (
+          <>
+            <div className="mtr-header">
+              <h1>SHUTTLE VOYAGE MTR</h1>
+              <div className="mtr-sub">
+                <div><strong>Location:</strong> {selectedGroup.locationCode} - {selectedGroup.locationName}</div>
+                <div><strong>Printed:</strong> {new Date().toLocaleString()}</div>
+                <div><strong>Shuttle:</strong> {selectedGroup.shuttleAssetCode} - {selectedGroup.shuttleAssetName}</div>
+                <div><strong>Shuttle No:</strong> {selectedGroup.shuttleNumber}</div>
+              </div>
+            </div>
+
+            <div className="mtr-kv">
+              <div className="mtr-kv-grid">
+                <div><strong>Status:</strong> {selectedGroup.voyageStatus}</div>
+                <div><strong>Tickets (Approved):</strong> {(sortedSelectedTickets || []).length}</div>
+
+                <div><strong>Net Receipt (BBL):</strong> {Number(selectedGroup.netReceiptBbl || 0).toFixed(3)}</div>
+                <div><strong>Net Discharge (BBL):</strong> {Number(selectedGroup.netDischargeBbl || 0).toFixed(3)}</div>
+
+                <div><strong>Last Closing Stock (BBL):</strong> {Number(voyageSummary?.lastClosingStock || 0).toFixed(3)}</div>
+                <div><strong>Last Closing Water (BBL):</strong> {Number(voyageSummary?.lastClosingWater || 0).toFixed(3)}</div>
+              </div>
+            </div>
+
+            <table className="mtr-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '10%' }}>Date</th>
+                  <th style={{ width: '8%' }}>Time</th>
+                  <th style={{ width: '14%' }}>Operation</th>
+                  <th style={{ width: '8%' }}>Sign</th>
+                  <th style={{ width: '12%' }}>Net Stock</th>
+                  <th style={{ width: '12%' }}>Net Water</th>
+                  <th style={{ width: '12%' }}>Qty (Abs S+W)</th>
+                  <th style={{ width: '24%' }}>Ticket</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(sortedSelectedTickets || []).map((t) => {
+                  const netStock = Number(t.netStockBbl || 0)
+                  const netWater = Number(t.netWaterBbl || 0)
+                  const qty = Math.abs(netStock) + Math.abs(netWater)
+
+                  return (
+                    <tr key={`p-${t.transactionId}`}>
+                      <td>{t.operationDate || ''}</td>
+                      <td>{t.eventTime || ''}</td>
+                      <td>{t.vesselOperationLabel || t.vesselOperationCode || ''}</td>
+                      <td>{t.vesselOperationSign || ''}</td>
+                      <td>{netStock.toFixed(3)}</td>
+                      <td>{netWater.toFixed(3)}</td>
+                      <td>{qty.toFixed(3)}</td>
+                      <td>{t.ticketNumber || t.transactionId}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+
+            <div className="mtr-footer">
+              <div>System: Hydrocarbon Accounting</div>
+              <div>Module: Shuttle Tracking</div>
+            </div>
+          </>
+        ) : (
+          <div className="mtr-header">
+            <h1>SHUTTLE VOYAGE MTR</h1>
+            <div style={{ fontSize: 11 }}>Select a voyage on screen first, then click Print.</div>
+          </div>
+        )}
+      </div>
+
+      <div className="screen-only">
+        <div>
       <div className="page-title">
         <div>
           <h2>Shuttle Tracking</h2>
@@ -1031,8 +1052,8 @@ function ShuttleTracking({
               <tr>
                 <th>Key</th>
                 <th>Status</th>
-                <th>Net Stock</th>
-                <th>Net Water</th>
+                <th>Net Receipt</th>
+                <th>Net Discharge</th>
                 <th>Tickets</th>
               </tr>
             </thead>
@@ -1055,8 +1076,8 @@ function ShuttleTracking({
                       <strong>{r.locationCode}</strong> | {r.shuttleAssetCode} | {r.shuttleNumber}
                     </td>
                     <td>{r.voyageStatus}</td>
-                    <td>{Number(r.totalNsvBbl || 0).toFixed(3)}</td>
-                    <td>{Number(r.totalFreeWaterBbl || 0).toFixed(3)}</td>
+                    <td>{Number(r.netReceiptBbl || 0).toFixed(3)}</td>
+                    <td>{Number(r.netDischargeBbl || 0).toFixed(3)}</td>
                     <td>{(r.tickets || []).length}</td>
                   </tr>
                 ))
@@ -1105,8 +1126,8 @@ function ShuttleTracking({
                     <button type="button" disabled={loading} onClick={exportExcelForSelected}>
                       Export Excel
                     </button>
-                    <button type="button" onClick={() => window.print()}>
-                      Print
+                    <button type="button" className="no-print" onClick={() => window.print()}>
+                      Print (MTR)
                     </button>
                   </div>
                 </div>
@@ -1124,8 +1145,6 @@ function ShuttleTracking({
                           <th>Approved Tickets</th>
                           <th>Last Closing Stock (BBL)</th>
                           <th>Last Closing Water (BBL)</th>
-                          <th>Total Net Stock (BBL)</th>
-                          <th>Total Net Water (BBL)</th>
                         </tr>
                       </thead>
 
@@ -1135,11 +1154,15 @@ function ShuttleTracking({
                           <td>{voyageSummary?.ticketCount ?? 0}</td>
                           <td>{Number(voyageSummary?.lastClosingStock ?? 0).toFixed(3)}</td>
                           <td>{Number(voyageSummary?.lastClosingWater ?? 0).toFixed(3)}</td>
-                          <td>{Number(voyageSummary?.totalNetStock ?? 0).toFixed(3)}</td>
-                          <td>{Number(voyageSummary?.totalNetWater ?? 0).toFixed(3)}</td>
                         </tr>
                       </tbody>
                     </table>
+                    {voyageSummary?.isClosed && voyageSummary?.netDischargeBbl != null ? (
+                      <div className="info-box" style={{ marginTop: 10 }}>
+                        <strong>Total Discharge to FSO (BBL):</strong>{' '}
+                        {Number(voyageSummary.netDischargeBbl).toFixed(3)}
+                      </div>
+                    ) : null}
                     <div className="form-actions no-print" style={{ marginTop: 10 }}>
                       <button type="button" onClick={() => openMappingForVoyage('all')}>
                         Open Movement Mapping
@@ -1545,92 +1568,6 @@ function ShuttleTracking({
         </div>
       </div>
       </div>
-      {/* ============================
-          PRINT ONLY A4 REPORT
-      ============================ */}
-      <div className="print-only">
-        {!selectedGroup ? null : (
-          <div className="print-report">
-            <h1>Shuttle Voyage Report</h1>
-
-            <div className="print-meta">
-              <div>
-                <strong>Location:</strong> {selectedGroup.locationCode} -{' '}
-                {selectedGroup.locationName}
-              </div>
-              <div>
-                <strong>Shuttle Asset:</strong> {selectedGroup.shuttleAssetCode} -{' '}
-                {selectedGroup.shuttleAssetName}
-              </div>
-              <div>
-                <strong>Shuttle Number:</strong> {selectedGroup.shuttleNumber}
-              </div>
-              <div>
-                <strong>Status:</strong> {selectedGroup.voyageStatus}
-              </div>
-            </div>
-
-            <h2>Summary</h2>
-            <table className="print-table">
-              <thead>
-                <tr>
-                  <th>Approved Tickets</th>
-                  <th>Last Closing Stock</th>
-                  <th>Last Closing Water</th>
-                  <th>Total Net Stock</th>
-                  <th>Total Net Water</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>{voyageSummary?.ticketCount ?? 0}</td>
-                  <td>{Number(voyageSummary?.lastClosingStock ?? 0).toFixed(3)}</td>
-                  <td>{Number(voyageSummary?.lastClosingWater ?? 0).toFixed(3)}</td>
-                  <td>{Number(voyageSummary?.totalNetStock ?? 0).toFixed(3)}</td>
-                  <td>{Number(voyageSummary?.totalNetWater ?? 0).toFixed(3)}</td>
-                </tr>
-              </tbody>
-            </table>
-
-            <h2>Timeline (Approved)</h2>
-            <table className="print-table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Time</th>
-                  <th>Operation</th>
-                  <th>Opening Stock</th>
-                  <th>Opening Water</th>
-                  <th>Closing Stock</th>
-                  <th>Closing Water</th>
-                  <th>Net Stock</th>
-                  <th>Net Water</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedSelectedTickets.map((t) => (
-                  <tr key={`p-${t.transactionId}`}>
-                    <td>{t.operationDate || ''}</td>
-                    <td>{t.eventTime || ''}</td>
-                    <td>{t.vesselOperationLabel || t.vesselOperationCode || ''}</td>
-                    <td>{Number(t.openingStockBbl || 0).toFixed(3)}</td>
-                    <td>{Number(t.openingWaterBbl || 0).toFixed(3)}</td>
-                    <td>{Number(t.closingStockBbl || 0).toFixed(3)}</td>
-                    <td>{Number(t.closingWaterBbl || 0).toFixed(3)}</td>
-                    <td>{Number(t.netStockBbl || 0).toFixed(3)}</td>
-                    <td>{Number(t.netWaterBbl || 0).toFixed(3)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            <div className="print-note">
-              <div>
-                <strong>Note:</strong> Approved tickets only. Draft/Submitted are excluded.
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </>
   )

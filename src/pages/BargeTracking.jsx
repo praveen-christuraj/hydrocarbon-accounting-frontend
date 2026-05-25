@@ -479,6 +479,10 @@ return (
             const summary = cmp.summary_json || {}
             const left = summary.left || {}
             const right = summary.right || {}
+            const sealChecks = Array.isArray(summary.seal_checks)
+              ? summary.seal_checks
+              : []
+            const sealMismatch = Boolean(summary.seal_mismatch)
 
             const leftTotals = left.totals || {}
             const rightTotals = right.totals || {}
@@ -598,6 +602,48 @@ return (
                       </tbody>
                     </table>
                   </div>
+                </div>
+
+                <div className="barge-mtr-section">
+                  <h2>
+                    Seal Check{' '}
+                    {sealMismatch ? (
+                      <span style={{ color: 'red' }}>(Mismatch)</span>
+                    ) : (
+                      <span>(OK)</span>
+                    )}
+                  </h2>
+
+                  <table className="barge-mtr-table">
+                    <thead>
+                      <tr>
+                        <th>Seal</th>
+                        <th>Sender</th>
+                        <th>Receiver</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sealChecks.length === 0 ? (
+                        <tr>
+                          <td colSpan="4">
+                            No seal data recorded in this comparison.
+                          </td>
+                        </tr>
+                      ) : (
+                        sealChecks.map((s) => (
+                          <tr key={s.seal_name}>
+                            <td>
+                              <strong>{s.seal_name}</strong>
+                            </td>
+                            <td>{s.sender || '-'}</td>
+                            <td>{s.receiver || '-'}</td>
+                            <td>{s.status}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
                 </div>
 
                 <div className="barge-mtr-two-column">

@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import * as XLSX from 'xlsx'
 import {
   bulkSaveTable11Factors,
   clearTable11Factors,
@@ -195,8 +194,8 @@ function Table11FactorMaster({ loggedInUser }) {
     const fileName = selectedFile.name
     const fileExtension = fileName.split('.').pop().toLowerCase()
 
-    if (fileExtension !== 'xlsx' && fileExtension !== 'csv') {
-      alert('Only XLSX and CSV files are allowed.')
+    if (fileExtension !== 'csv') {
+      alert('XLSX upload disabled. Upload CSV.')
       e.target.value = ''
       return
     }
@@ -204,26 +203,8 @@ function Table11FactorMaster({ loggedInUser }) {
     try {
       let matrixRows = []
 
-      if (fileExtension === 'csv') {
-        const csvText = await selectedFile.text()
-        matrixRows = parseCsvTextToMatrix(csvText)
-      } else {
-        const arrayBuffer = await selectedFile.arrayBuffer()
-        const workbook = XLSX.read(arrayBuffer, { type: 'array' })
-        const firstSheetName = workbook.SheetNames[0]
-
-        if (!firstSheetName) {
-          throw new Error('Uploaded XLSX file does not contain any sheet.')
-        }
-
-        const worksheet = workbook.Sheets[firstSheetName]
-
-        matrixRows = XLSX.utils.sheet_to_json(worksheet, {
-          header: 1,
-          defval: '',
-          raw: false,
-        })
-      }
+      const csvText = await selectedFile.text()
+      matrixRows = parseCsvTextToMatrix(csvText)
 
       const validation = normalizeRowsFromMatrix(matrixRows)
 
@@ -373,17 +354,17 @@ function Table11FactorMaster({ loggedInUser }) {
           <div className="section-title compact-section-title">
             <h3>Upload Table 11 File</h3>
             <p>
-              Upload CSV or XLSX. Header row is optional. The first two columns
+              Upload CSV. Header row is optional. The first two columns
               must be API @ 60°F and LT Factor.
             </p>
           </div>
         </div>
 
         <div>
-          <label>Upload CSV / XLSX</label>
+          <label>Upload CSV</label>
           <input
             type="file"
-            accept=".csv,.xlsx"
+            accept=".csv"
             onChange={handleFileUpload}
             disabled={!canManage || loading}
           />

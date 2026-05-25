@@ -6,6 +6,12 @@ export const navigationItems = [
     permission: null,
   },
   {
+    label: 'Dashboard',
+    path: '/dashboard',
+    type: 'link',
+    permission: 'View Dashboard',
+  },
+  {
     label: 'User Management',
     type: 'dropdown',
     items: [
@@ -169,7 +175,11 @@ export const navigationItems = [
         label: 'Shuttle Tracking',
         path: '/shuttle-tracking',
         disabled: false,
-        permission: 'View Shuttle Tracking',
+      },
+      {
+        label: 'FSO Tracking',
+        path: '/fso-tracking',
+        disabled: false,
       },
       {
         label: 'Operation Transaction Register',
@@ -240,6 +250,12 @@ export const navigationItems = [
         label: 'Company Report Profile Master',
         path: '/company-report-profiles',
         disabled: false,
+      },
+      {
+        label: 'Dashboard Builder',
+        path: '/dashboard-builder',
+        type: 'link',
+        permission: 'Manage Dashboard',
       },
       {
         label: 'Barge Seal Master',

@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react'
-import * as XLSX from 'xlsx'
 import { getMaterialBalanceReport } from '../api/materialBalanceReportApi'
 
 function MaterialBalanceReport({ locations, assets }) {
@@ -289,124 +288,6 @@ function MaterialBalanceReport({ locations, assets }) {
     )
   }
 
-  const handleExportExcel = () => {
-    if (rows.length === 0) {
-      alert('No Material Balance rows available to export')
-      return
-    }
-
-    const reportRows = rows.map((row) => {
-      const exportRow = {
-        'Accounting Date': row.accountingDate,
-        'Location Code': row.locationCode,
-        'Location Name': row.locationName,
-        'Tank Asset Code': row.tankAssetCode || '',
-        'Tank Asset Name': row.tankAssetName || '',
-        Product: row.productName || '',
-      }
-
-      sortedColumns.forEach((column) => {
-        exportRow[`${column.columnLabel} ${getUnitLabel()}`] = Number(
-          row.values?.[column.columnKey] || 0
-        )
-      })
-
-      exportRow['Rows Count'] = Number(row.rowsCount || 0)
-      exportRow['Last Ticket'] = row.lastTicketNumber || ''
-
-      return exportRow
-    })
-
-    const summaryRows = [
-      {
-        Particular: `Total IN ${getUnitLabel()}`,
-        Value: Number(totals.movementInTotal || 0),
-      },
-      {
-        Particular: `Total OUT ${getUnitLabel()}`,
-        Value: Number(totals.movementOutTotal || 0),
-      },
-      {
-        Particular: `${totals.closingColumnLabel} ${getUnitLabel()}`,
-        Value: Number(totals.finalClosing || 0),
-      },
-      {
-        Particular: `${totals.lossGainColumnLabel} ${getUnitLabel()}`,
-        Value: Number(totals.lossGainTotal || 0),
-      },
-    ]
-
-    const templateColumnRows = sortedColumns.map((column) => ({
-      'Column Order': column.columnOrder,
-      'Column Key': column.columnKey,
-      'Column Label': column.columnLabel,
-      'Column Type': column.columnType,
-      Direction: column.movementDirection || '',
-      'Include in Material Balance': column.includeInMaterialBalance,
-      'Include in Book Closing': column.includeInBookClosing,
-      'Internal Transfer': column.isInternalTransfer,
-    }))
-
-    const filterRows = [
-      {
-        Filter: 'Template',
-        Value: template?.templateName || '',
-      },
-      {
-        Filter: 'Location',
-        Value: filters.locationCode || '',
-      },
-      {
-        Filter: 'Tank Asset',
-        Value: filters.tankAssetCode || 'All Tanks',
-      },
-      {
-        Filter: 'Product',
-        Value: filters.productName || 'All Products',
-      },
-      {
-        Filter: 'Unit',
-        Value: getUnitLabel(),
-      },
-      {
-        Filter: 'Accounting Date From',
-        Value: filters.dateFrom || '',
-      },
-      {
-        Filter: 'Accounting Date To',
-        Value: filters.dateTo || '',
-      },
-    ]
-
-    const workbook = XLSX.utils.book_new()
-
-    XLSX.utils.book_append_sheet(
-      workbook,
-      XLSX.utils.json_to_sheet(reportRows),
-      'Material Balance'
-    )
-
-    XLSX.utils.book_append_sheet(
-      workbook,
-      XLSX.utils.json_to_sheet(summaryRows),
-      'Summary'
-    )
-
-    XLSX.utils.book_append_sheet(
-      workbook,
-      XLSX.utils.json_to_sheet(templateColumnRows),
-      'Template Columns'
-    )
-
-    XLSX.utils.book_append_sheet(
-      workbook,
-      XLSX.utils.json_to_sheet(filterRows),
-      'Filters'
-    )
-
-    XLSX.writeFile(workbook, 'material-balance-report.xlsx')
-  }
-
   const handlePrintReport = () => {
     if (rows.length === 0) {
       alert('No Material Balance rows available to print')
@@ -531,12 +412,6 @@ function MaterialBalanceReport({ locations, assets }) {
         <div className="filter-actions">
           <button type="button" onClick={handleExportCsv} disabled={loading}>
             Export CSV
-          </button>
-        </div>
-
-        <div className="filter-actions">
-          <button type="button" onClick={handleExportExcel} disabled={loading}>
-            Export Excel
           </button>
         </div>
 
