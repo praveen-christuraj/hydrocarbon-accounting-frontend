@@ -11,7 +11,22 @@ function PermissionGuard({
   const currentUser = loggedInUser
 
   const userHasPermission = (permissionName) => {
-    // ✅ Admin bypass: if user has Admin role, allow everything in UI
+    // If no permission is required, allow
+    if (!permissionName) {
+      return true
+    }
+
+    // Must be logged in
+    if (!currentUser) {
+      return false
+    }
+
+    // ✅ Admin bypass (bootstrap): allow all if username is admin OR role is Admin
+    const username = String(currentUser?.username || '').toLowerCase()
+    if (username === 'admin') {
+      return true
+    }
+
     const roles = currentUser?.roles || currentUser?.user_roles || []
     const isAdmin = roles.some((r) => {
       const roleName =
@@ -19,18 +34,20 @@ function PermissionGuard({
       return String(roleName || '').toLowerCase() === 'admin'
     })
 
-    if (isAdmin) return true
-
-    if (!permissionName) {
+    if (isAdmin) {
       return true
     }
 
-    if (!loggedInUser || !loggedInUser.permissions) {
+    // Normal permission check (expects loggedInUser.permissions to be available)
+    if (!currentUser.permissions || !Array.isArray(currentUser.permissions)) {
       return false
     }
 
-    return loggedInUser.permissions.some((permission) => {
-      return permission.permissionName === permissionName
+    return currentUser.permissions.some((permission) => {
+      return (
+        permission?.permissionName === permissionName ||
+        permission?.permission_name === permissionName
+      )
     })
   }
 
@@ -56,8 +73,7 @@ function PermissionGuard({
         </div>
 
         <div className="info-box">
-          Required permission
-          {permissionList.length > 1 ? 's' : ''}:{' '}
+          Required permission{permissionList.length > 1 ? 's' : ''}:{' '}
           {permissionList.join(', ')}
         </div>
 
