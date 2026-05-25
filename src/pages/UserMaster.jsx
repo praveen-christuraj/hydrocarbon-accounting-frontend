@@ -1,7 +1,7 @@
-import { useState } from 'react'
-import { createUser, deleteUser, updateUser } from '../api/userApi'
+import { useEffect, useState } from 'react'
+import { createUser, deleteUser, getUsers, updateUser } from '../api/userApi'
 
-function UserMaster({ users, reloadUsers, loggedInUser }) {
+function UserMaster({ loggedInUser }) {
   const emptyUser = {
     fullName: '',
     username: '',
@@ -13,49 +13,50 @@ function UserMaster({ users, reloadUsers, loggedInUser }) {
     status: 'Active',
   }
 
+  const [users, setUsers] = useState([])
   const [user, setUser] = useState(emptyUser)
   const [editId, setEditId] = useState(null)
   const [loading, setLoading] = useState(false)
 
-  const hasPermission = (permissionName) => {
-    if (!loggedInUser || !loggedInUser.permissions) {
-      return false
-    }
+  const isAdminBootstrap =
+    String(loggedInUser?.username || '').toLowerCase() === 'admin'
 
-    return loggedInUser.permissions.some((permission) => {
-      return permission.permissionName === permissionName
-    })
+  const hasPermission = (permissionName) => {
+    if (isAdminBootstrap) return true
+    if (!loggedInUser || !Array.isArray(loggedInUser.permissions)) return false
+    return loggedInUser.permissions.some(
+      (p) => p.permissionName === permissionName
+    )
   }
 
   const canManageUser = hasPermission('Manage User')
 
+  const reloadUsers = async () => {
+    try {
+      const data = await getUsers()
+      setUsers(data)
+    } catch (error) {
+      alert(error.message)
+      setUsers([])
+    }
+  }
+
+  useEffect(() => {
+    reloadUsers()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const handleChange = (e) => {
-    setUser({
-      ...user,
-      [e.target.name]: e.target.value,
-    })
+    setUser({ ...user, [e.target.name]: e.target.value })
   }
 
   const validateUser = () => {
-    if (user.fullName.trim() === '') {
-      alert('Full Name is required')
-      return false
-    }
+    if (user.fullName.trim() === '') return alert('Full Name is required'), false
+    if (user.username.trim() === '') return alert('Username is required'), false
+    if (user.email.trim() === '') return alert('Email is required'), false
 
-    if (user.username.trim() === '') {
-      alert('Username is required')
-      return false
-    }
-
-    if (user.email.trim() === '') {
-      alert('Email is required')
-      return false
-    }
-
-    if (editId === null && user.password.trim() === '') {
-      alert('Password is required for new user')
-      return false
-    }
+    if (editId === null && user.password.trim() === '')
+      return alert('Password is required for new user'), false
 
     const usernameAlreadyExists = users.some((item) => {
       return (
@@ -64,10 +65,8 @@ function UserMaster({ users, reloadUsers, loggedInUser }) {
       )
     })
 
-    if (usernameAlreadyExists) {
-      alert('Username already exists. Please choose another username.')
-      return false
-    }
+    if (usernameAlreadyExists)
+      return alert('Username already exists. Please choose another username.'), false
 
     return true
   }
@@ -80,23 +79,20 @@ function UserMaster({ users, reloadUsers, loggedInUser }) {
       return
     }
 
-    if (!validateUser()) {
-      return
-    }
+    if (!validateUser()) return
 
     try {
       setLoading(true)
 
       if (editId === null) {
         await createUser(user)
-        alert('User saved successfully')
+        alert('User created successfully')
       } else {
         await updateUser(editId, user)
         alert('User updated successfully')
       }
 
       await reloadUsers()
-
       setUser(emptyUser)
       setEditId(null)
     } catch (error) {
@@ -106,57 +102,39 @@ function UserMaster({ users, reloadUsers, loggedInUser }) {
     }
   }
 
-  const handleEdit = (userToEdit) => {
-    if (!canManageUser) {
-      alert('You do not have permission to manage users.')
-      return
-    }
-
+  const handleEdit = (u) => {
     setUser({
-      fullName: userToEdit.fullName,
-      username: userToEdit.username,
-      email: userToEdit.email,
-      phone: userToEdit.phone || '',
-      department: userToEdit.department || '',
-      designation: userToEdit.designation || '',
+      fullName: u.fullName,
+      username: u.username,
+      email: u.email,
+      phone: u.phone || '',
+      department: u.department || '',
+      designation: u.designation || '',
       password: '',
-      status: userToEdit.status,
+      status: u.status,
     })
-
-    setEditId(userToEdit.id)
+    setEditId(u.id)
   }
 
-  const handleDelete = async (userToDelete) => {
+  const handleDelete = async (id) => {
     if (!canManageUser) {
       alert('You do not have permission to manage users.')
       return
     }
 
-    if (loggedInUser && loggedInUser.id === userToDelete.id) {
-      alert('You cannot delete your own logged-in user account.')
-      return
-    }
-
-    const confirmDelete = window.confirm(
-      'Are you sure you want to delete this user?'
-    )
-
-    if (confirmDelete === false) {
-      return
-    }
+    const ok = window.confirm('Are you sure you want to delete this user?')
+    if (!ok) return
 
     try {
       setLoading(true)
-
-      await deleteUser(userToDelete.id)
+      await deleteUser(id)
       await reloadUsers()
+      alert('User deleted successfully')
 
-      if (editId === userToDelete.id) {
+      if (editId === id) {
         setUser(emptyUser)
         setEditId(null)
       }
-
-      alert('User deleted successfully')
     } catch (error) {
       alert(error.message)
     } finally {
@@ -182,131 +160,118 @@ function UserMaster({ users, reloadUsers, loggedInUser }) {
 
       {!canManageUser && (
         <div className="info-box">
-          You have View User permission only. Create, edit, and delete actions
-          are disabled.
+          You are in view-only mode. Admin can manage users.
         </div>
       )}
 
-      {canManageUser && (
-        <form onSubmit={handleSubmit}>
-          <div>
-            <label>Full Name</label>
-            <input
-              name="fullName"
-              type="text"
-              value={user.fullName}
-              onChange={handleChange}
-              placeholder="Enter full name"
-            />
-          </div>
+      <form onSubmit={handleSubmit}>
+        <div>
+          <label>Full Name</label>
+          <input
+            name="fullName"
+            type="text"
+            value={user.fullName}
+            onChange={handleChange}
+            placeholder="Enter full name"
+          />
+        </div>
 
-          <div>
-            <label>Username</label>
-            <input
-              name="username"
-              type="text"
-              value={user.username}
-              onChange={handleChange}
-              placeholder="Enter username"
-            />
-          </div>
+        <div>
+          <label>Username</label>
+          <input
+            name="username"
+            type="text"
+            value={user.username}
+            onChange={handleChange}
+            placeholder="Enter username"
+            disabled={editId !== null} // safer: don't allow username change
+          />
+        </div>
 
-          <div>
-            <label>Email</label>
-            <input
-              name="email"
-              type="email"
-              value={user.email}
-              onChange={handleChange}
-              placeholder="Enter email address"
-            />
-          </div>
+        <div>
+          <label>Email</label>
+          <input
+            name="email"
+            type="email"
+            value={user.email}
+            onChange={handleChange}
+            placeholder="Enter email address"
+          />
+        </div>
 
-          <div>
-            <label>Phone</label>
-            <input
-              name="phone"
-              type="text"
-              value={user.phone}
-              onChange={handleChange}
-              placeholder="Enter phone number"
-            />
-          </div>
+        <div>
+          <label>Phone</label>
+          <input
+            name="phone"
+            type="text"
+            value={user.phone}
+            onChange={handleChange}
+            placeholder="Enter phone number"
+          />
+        </div>
 
-          <div>
-            <label>Department</label>
-            <input
-              name="department"
-              type="text"
-              value={user.department}
-              onChange={handleChange}
-              placeholder="Enter department"
-            />
-          </div>
+        <div>
+          <label>Department</label>
+          <input
+            name="department"
+            type="text"
+            value={user.department}
+            onChange={handleChange}
+            placeholder="Enter department"
+          />
+        </div>
 
-          <div>
-            <label>Designation</label>
-            <input
-              name="designation"
-              type="text"
-              value={user.designation}
-              onChange={handleChange}
-              placeholder="Enter designation"
-            />
-          </div>
+        <div>
+          <label>Designation</label>
+          <input
+            name="designation"
+            type="text"
+            value={user.designation}
+            onChange={handleChange}
+            placeholder="Enter designation"
+          />
+        </div>
 
-          <div>
-            <label>
-              Password{' '}
-              {editId !== null ? '(leave blank to keep existing password)' : ''}
-            </label>
-            <input
-              name="password"
-              type="password"
-              value={user.password}
-              onChange={handleChange}
-              placeholder={
-                editId === null
-                  ? 'Enter password'
-                  : 'Leave blank to keep existing password'
-              }
-            />
-          </div>
+        <div>
+          <label>Password {editId !== null ? '(leave blank to keep same)' : ''}</label>
+          <input
+            name="password"
+            type="password"
+            value={user.password}
+            onChange={handleChange}
+            placeholder="Enter password"
+          />
+        </div>
 
-          <div>
-            <label>Status</label>
-            <select name="status" value={user.status} onChange={handleChange}>
-              <option>Active</option>
-              <option>Inactive</option>
-              <option>Blocked</option>
-            </select>
-          </div>
+        <div>
+          <label>Status</label>
+          <select name="status" value={user.status} onChange={handleChange}>
+            <option>Active</option>
+            <option>Inactive</option>
+            <option>Blocked</option>
+          </select>
+        </div>
 
-          <div className="form-actions">
-            <button type="submit" disabled={loading}>
-              {loading
-                ? 'Please wait...'
-                : editId === null
-                  ? 'Save User'
-                  : 'Update User'}
+        <div className="form-actions">
+          <button type="submit" disabled={loading || !canManageUser}>
+            {loading
+              ? 'Please wait...'
+              : editId === null
+                ? 'Save User'
+                : 'Update User'}
+          </button>
+
+          {editId !== null && (
+            <button type="button" onClick={handleCancelEdit} disabled={loading}>
+              Cancel Edit
             </button>
-
-            {editId !== null && (
-              <button
-                type="button"
-                onClick={handleCancelEdit}
-                disabled={loading}
-              >
-                Cancel Edit
-              </button>
-            )}
-          </div>
-        </form>
-      )}
+          )}
+        </div>
+      </form>
 
       <div className="section-title">
         <h3>Saved Users</h3>
-        <p>Users are now saved permanently in PostgreSQL.</p>
+        <p>Users are loaded from the live database.</p>
       </div>
 
       <table>
@@ -315,19 +280,18 @@ function UserMaster({ users, reloadUsers, loggedInUser }) {
             <th>Full Name</th>
             <th>Username</th>
             <th>Email</th>
-            <th>Phone</th>
             <th>Department</th>
             <th>Designation</th>
             <th>Status</th>
-            {canManageUser && <th>Actions</th>}
+            <th>Actions</th>
           </tr>
         </thead>
 
         <tbody>
           {users.length === 0 ? (
             <tr>
-              <td colSpan={canManageUser ? 8 : 7} className="empty-table">
-                No users added yet.
+              <td colSpan="7" className="empty-table">
+                No users found.
               </td>
             </tr>
           ) : (
@@ -336,7 +300,6 @@ function UserMaster({ users, reloadUsers, loggedInUser }) {
                 <td>{item.fullName}</td>
                 <td>{item.username}</td>
                 <td>{item.email}</td>
-                <td>{item.phone}</td>
                 <td>{item.department}</td>
                 <td>{item.designation}</td>
                 <td>
@@ -344,18 +307,23 @@ function UserMaster({ users, reloadUsers, loggedInUser }) {
                     {item.status}
                   </span>
                 </td>
+                <td>
+                  <button
+                    type="button"
+                    onClick={() => handleEdit(item)}
+                    disabled={!canManageUser || loading}
+                  >
+                    Edit
+                  </button>
 
-                {canManageUser && (
-                  <td>
-                    <button type="button" onClick={() => handleEdit(item)}>
-                      Edit
-                    </button>
-
-                    <button type="button" onClick={() => handleDelete(item)}>
-                      Delete
-                    </button>
-                  </td>
-                )}
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(item.id)}
+                    disabled={!canManageUser || loading}
+                  >
+                    Delete
+                  </button>
+                </td>
               </tr>
             ))
           )}
