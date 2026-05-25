@@ -8,7 +8,19 @@ function PermissionGuard({
   fallbackTitle = 'Access Denied',
   fallbackMessage = 'You do not have permission to access this page.',
 }) {
+  const currentUser = loggedInUser
+
   const userHasPermission = (permissionName) => {
+    // ✅ Admin bypass: if user has Admin role, allow everything in UI
+    const roles = currentUser?.roles || currentUser?.user_roles || []
+    const isAdmin = roles.some((r) => {
+      const roleName =
+        r?.role_name || r?.roleName || r?.role?.role_name || r?.role?.roleName
+      return String(roleName || '').toLowerCase() === 'admin'
+    })
+
+    if (isAdmin) return true
+
     if (!permissionName) {
       return true
     }

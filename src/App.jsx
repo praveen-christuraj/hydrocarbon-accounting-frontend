@@ -131,7 +131,17 @@ function PageHelp() {
 }
 
 function NavigationBar({ loggedInUser }) {
+  const currentUser = loggedInUser
+
   const hasPermission = (permissionName) => {
+    // Admin bypass: if user has Admin role, allow everything in UI
+    const isAdmin =
+      (currentUser?.roles || []).some(
+        (r) => String(r?.role_name || r?.roleName || '').toLowerCase() === 'admin'
+      ) || String(currentUser?.role_name || currentUser?.roleName || '').toLowerCase() === 'admin'
+
+    if (isAdmin) return true
+
     if (!permissionName) {
       return true
     }
