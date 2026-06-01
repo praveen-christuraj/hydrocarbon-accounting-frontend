@@ -15,6 +15,7 @@ import StockMovementLayout from '../components/operationLayouts/StockMovementLay
 import VesselCycleLayout from '../components/operationLayouts/VesselCycleLayout'
 import ShuttleTrackingLayout from '../components/operationLayouts/ShuttleTrackingLayout'
 import FSOTrackingLayout from '../components/operationLayouts/FSOTrackingLayout.jsx'
+import FlowmeterReadingLayout from '../components/operationLayouts/FlowmeterReadingLayout'
 
 function LayoutSummaryPanel({ selectedTemplate }) {
   if (!selectedTemplate) {
@@ -432,28 +433,11 @@ function OperationLayoutRenderer({
   if (layoutType === 'Meter Reading') {
     return (
       <>
-        <LayoutPlaceholder
-          title="Meter Reading Layout"
-          description="Designed for flowmeter or metering skid entries using opening/closing meter readings and meter factor."
-          sections={[
-            {
-              title: 'Meter Details',
-              items: ['Metering asset', 'Meter stream', 'Unit', 'Meter factor'],
-            },
-            {
-              title: 'Readings',
-              items: [
-                'Opening reading',
-                'Closing reading',
-                'Corrected net',
-                'Converted net',
-              ],
-            },
-            {
-              title: 'Totalization',
-              items: ['Stream totals', 'Total net volume', 'Warning checks'],
-            },
-          ]}
+        <FlowmeterReadingLayout
+          entry={entry}
+          selectedAsset={selectedAsset}
+          handleValueChange={handleValueChange}
+          setEntryField={setEntryField}
         />
 
         <OperationTemplateFields
@@ -462,6 +446,17 @@ function OperationLayoutRenderer({
           selectedTemplateFields={selectedTemplateFields}
           handleValueChange={handleValueChange}
           getInputType={getInputType}
+          excludedFieldCodes={[
+            'flowmeter_payload',
+            'meter_label',
+            'opening_reading',
+            'closing_reading',
+            'meter_factor',
+            'meter_unit',
+            'gross_observed',
+            'net_standard',
+            'net_standard_bbl',
+          ]}
         />
       </>
     )
@@ -1131,6 +1126,92 @@ function OperationEntry({
       const hasTankerPayload = (entry.values || []).some((v) => v.fieldCode === 'tanker_payload')
       if (!hasTankerPayload) {
         alert('Template setup required: Add System field "tanker_payload" in Operation Template.')
+        return
+      }
+    }
+
+    if (layoutType === 'Meter Reading') {
+      const hasFlowmeterPayload = (entry.values || []).some((v) => v.fieldCode === 'flowmeter_payload')
+      if (!hasFlowmeterPayload) {
+        alert('Template setup required: Add System field "flowmeter_payload" in Operation Template.')
+        return
+      }
+
+      const flowmeterPayloadRow = (entry.values || []).find((v) => v.fieldCode === 'flowmeter_payload')
+      const payload =
+        typeof flowmeterPayloadRow?.fieldValue === 'object'
+          ? flowmeterPayloadRow.fieldValue
+          : (() => {
+              try {
+                return JSON.parse(String(flowmeterPayloadRow?.fieldValue || '{}'))
+              } catch {
+                return null
+              }
+            })()
+
+      const inputs = payload?.inputs || {}
+      const meters = Array.isArray(inputs.meters) ? inputs.meters : []
+      const tankTemp = Number(inputs.tank_temperature ?? NaN)
+      const sampleTemp = Number(inputs.sample_temperature ?? NaN)
+      const bsw = Number(inputs.bsw_percent ?? NaN)
+      const observedType = String(inputs.observed_input_type || '')
+      const observedApi = Number(inputs.observed_api ?? NaN)
+      const observedDensity = Number(inputs.observed_density ?? NaN)
+
+      if (!inputs.reading_date) {
+        alert('Flowmeter Date is required.')
+        return
+      }
+      if (meters.length > 0) {
+        if (!inputs.stream_name) {
+          alert('Flowmeter Stream is required.')
+          return
+        }
+        for (const meter of meters) {
+          const opening = Number(meter.opening_reading ?? NaN)
+          const closing = Number(meter.closing_reading ?? NaN)
+          const label = String(meter.meter_label || 'Meter')
+          if (!Number.isFinite(opening) || opening < 0) {
+            alert(`${label}: Opening Reading cannot be negative.`)
+            return
+          }
+          if (!Number.isFinite(closing) || closing < 0) {
+            alert(`${label}: Closing Reading cannot be negative.`)
+            return
+          }
+          if (closing < opening) {
+            alert(`${label}: Closing Reading cannot be less than Opening Reading.`)
+            return
+          }
+        }
+      } else if (!inputs.meter_label) {
+        alert('Flowmeter Meter Label is required.')
+        return
+      }
+      if (!Number.isFinite(tankTemp)) {
+        alert('Tank Temperature is required.')
+        return
+      }
+      if (!Number.isFinite(sampleTemp)) {
+        alert('Sample Temperature is required.')
+        return
+      }
+      if (!Number.isFinite(bsw) || bsw < 0 || bsw > 100) {
+        alert('BS & W must be between 0 and 100.')
+        return
+      }
+      if (observedType === 'Observed API') {
+        if (!Number.isFinite(observedApi)) {
+          alert('Observed API is required.')
+          return
+        }
+      } else if (observedType === 'Observed Density') {
+        if (!Number.isFinite(observedDensity)) {
+          alert('Observed Density is required.')
+          return
+        }
+      } else {
+        alert('Observed Input Type is required.')
         return
       }
     }

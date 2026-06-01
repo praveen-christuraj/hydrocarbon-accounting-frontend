@@ -85,6 +85,38 @@ const buildWidgetDefaults = (type) => {
     }
   }
 
+  if (t === 'TANK_VISUAL') {
+    return {
+      type: 'TANK_VISUAL',
+      title: 'Tank Levels',
+      data: {
+        data_source_code: 'TANK_STOCK_SNAPSHOT',
+        params: {
+          // auto-fill will set location_code from dashboard filters
+          value_field: 'NSV_BBL',
+          capacity_source: 'CALIBRATION_MAX',
+          sort_by: 'NAME',
+          limit: 50,
+          // optional multi-type selection (comma-separated)
+          // asset_type_codes: 'TANK'
+        },
+      },
+      config: {
+        columns: 4,
+        cardHeight: 220,
+        showPercent: true,
+        showStock: true,
+        showEmpty: true,
+        showCapacity: true,
+        thresholds: {
+          low: 20,
+          high: 80,
+        },
+        unit: 'bbl',
+      },
+    }
+  }
+
   return {
     type: 'TEXT',
     title: 'Notes',
@@ -352,8 +384,8 @@ function DashboardBuilder({
       i: id,
       x: 0,
       y: Infinity,
-      w: t === 'TABLE' ? 12 : 4,
-      h: t === 'TABLE' ? 8 : 4,
+      w: t === 'TABLE' || t === 'TANK_VISUAL' ? 12 : 4,
+      h: t === 'TABLE' ? 8 : t === 'TANK_VISUAL' ? 10 : 4,
     }
 
     setConfigJson((prev) => ({
@@ -606,7 +638,7 @@ function DashboardBuilder({
       return (
         <select value={value || ''} onChange={(e) => onChange(e.target.value)}>
           <option value="">{required ? 'Select (required)' : 'Select (optional)'}</option>
-          {assetTypeCodes.map((code) => (
+          {availableAssetTypeCodesAtLocation.map((code) => (
             <option key={code} value={code}>
               {code}
             </option>
@@ -833,6 +865,7 @@ function DashboardBuilder({
             <button type="button" onClick={() => addWidget('KPI')}>Add KPI</button>
             <button type="button" onClick={() => addWidget('TABLE')}>Add Table</button>
             <button type="button" onClick={() => addWidget('CHART')}>Add Chart</button>
+            <button type="button" onClick={() => addWidget('TANK_VISUAL')}>Add Tank Visual</button>
             <button type="button" onClick={() => addWidget('TEXT')}>Add Text</button>
           </div>
 
@@ -1043,6 +1076,120 @@ function DashboardBuilder({
                       <div style={{ marginTop: 10 }}>
                         <label>Y Field</label>
                         <input value={selectedWidget.config?.yField || ''} onChange={(e) => updateWidgetConfig({ yField: e.target.value })} />
+                      </div>
+                    </>
+                  ) : null}
+
+                  {selectedWidget.type === 'TANK_VISUAL' ? (
+                    <>
+                      <div style={{ marginTop: 10 }}>
+                        <label>Cards Per Row</label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="8"
+                          value={selectedWidget.config?.columns ?? 4}
+                          onChange={(e) =>
+                            updateWidgetConfig({ columns: Number(e.target.value || 4) })
+                          }
+                        />
+                      </div>
+
+                      <div style={{ marginTop: 10 }}>
+                        <label>Card Height (px)</label>
+                        <input
+                          type="number"
+                          min="160"
+                          max="500"
+                          value={selectedWidget.config?.cardHeight ?? 220}
+                          onChange={(e) =>
+                            updateWidgetConfig({ cardHeight: Number(e.target.value || 220) })
+                          }
+                        />
+                      </div>
+
+                      <div style={{ marginTop: 10, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <input
+                            type="checkbox"
+                            checked={Boolean(selectedWidget.config?.showPercent ?? true)}
+                            onChange={(e) => updateWidgetConfig({ showPercent: e.target.checked })}
+                          />
+                          Show %
+                        </label>
+
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <input
+                            type="checkbox"
+                            checked={Boolean(selectedWidget.config?.showStock ?? true)}
+                            onChange={(e) => updateWidgetConfig({ showStock: e.target.checked })}
+                          />
+                          Show Stock
+                        </label>
+
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <input
+                            type="checkbox"
+                            checked={Boolean(selectedWidget.config?.showEmpty ?? true)}
+                            onChange={(e) => updateWidgetConfig({ showEmpty: e.target.checked })}
+                          />
+                          Show Empty
+                        </label>
+
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <input
+                            type="checkbox"
+                            checked={Boolean(selectedWidget.config?.showCapacity ?? true)}
+                            onChange={(e) => updateWidgetConfig({ showCapacity: e.target.checked })}
+                          />
+                          Show Capacity
+                        </label>
+                      </div>
+
+                      <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                        <div>
+                          <label>Low Threshold (%)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={selectedWidget.config?.thresholds?.low ?? 20}
+                            onChange={(e) =>
+                              updateWidgetConfig({
+                                thresholds: {
+                                  ...(selectedWidget.config?.thresholds || {}),
+                                  low: Number(e.target.value || 0),
+                                },
+                              })
+                            }
+                          />
+                        </div>
+
+                        <div>
+                          <label>High Threshold (%)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={selectedWidget.config?.thresholds?.high ?? 80}
+                            onChange={(e) =>
+                              updateWidgetConfig({
+                                thresholds: {
+                                  ...(selectedWidget.config?.thresholds || {}),
+                                  high: Number(e.target.value || 0),
+                                },
+                              })
+                            }
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ marginTop: 10 }}>
+                        <label>Unit Label</label>
+                        <input
+                          value={selectedWidget.config?.unit ?? 'bbl'}
+                          onChange={(e) => updateWidgetConfig({ unit: e.target.value })}
+                        />
                       </div>
                     </>
                   ) : null}

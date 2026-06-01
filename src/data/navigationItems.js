@@ -111,6 +111,12 @@ export const navigationItems = [
         disabled: false,
         permission: 'View Asset Assignment Summary',
       },
+      {
+        label: 'Flowmeter Config',
+        path: '/flowmeter-configs',
+        disabled: false,
+        permission: 'View Flowmeter Config',
+      },
     ],
   },
   {
@@ -186,6 +192,12 @@ export const navigationItems = [
         path: '/operation-transactions',
         disabled: false,
         permission: 'View Operation Transaction',
+      },
+      {
+        label: 'Flowmeter Records',
+        path: '/flowmeter-records',
+        disabled: false,
+        permission: 'View Flowmeter Record',
       },
     ],
   },

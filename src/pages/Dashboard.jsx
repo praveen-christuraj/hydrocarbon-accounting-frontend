@@ -235,6 +235,318 @@ const TableWidget = ({ title, data, columns, limit }) => {
   )
 }
 
+const TankVisualWidget = ({ title, rows, config }) => {
+  const cols = Math.min(Math.max(Number(config?.columns ?? 4), 1), 8)
+  const cardHeight = Math.min(Math.max(Number(config?.cardHeight ?? 220), 160), 520)
+
+  const showPercent = Boolean(config?.showPercent ?? true)
+  const showStock = Boolean(config?.showStock ?? true)
+  const showEmpty = Boolean(config?.showEmpty ?? true)
+  const showCapacity = Boolean(config?.showCapacity ?? true)
+
+  const low = Number(config?.thresholds?.low ?? 20)
+  const high = Number(config?.thresholds?.high ?? 80)
+  const unit = safeString(config?.unit ?? 'bbl')
+
+  const items = Array.isArray(rows) ? rows : []
+
+  const pctColor = (p) => {
+    const v = Number(p || 0)
+    if (v <= low) return '#b91c1c' // low
+    if (v >= high) return '#065f46' // high
+    return '#1d4ed8' // normal
+  }
+
+  const fmt = (n) => {
+    const v = Number(n || 0)
+    if (!Number.isFinite(v)) return '0'
+    return v.toLocaleString(undefined, { maximumFractionDigits: 2 })
+  }
+
+  const TankSvg = ({ percent, color }) => {
+    const p = Math.min(Math.max(Number(percent || 0), 0), 100)
+
+    const cx = 60
+    const topY = 28
+    const bodyX = 25
+    const bodyY = topY
+    const bodyW = 70
+    const bodyH = 128
+    const rx = bodyW / 2
+    const ry = 12
+    const bottomY = bodyY + bodyH
+
+    const liquidH = bodyH * (p / 100)
+    const liquidTopY = bodyY + bodyH - liquidH
+
+    return (
+      <svg width="92" height="182" viewBox="0 0 120 190">
+        <defs>
+          {/* Metallic cylindrical body */}
+          <linearGradient id="tankBodyGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#c7ced8" />
+            <stop offset="14%" stopColor="#edf1f5" />
+            <stop offset="34%" stopColor="#cfd6df" />
+            <stop offset="55%" stopColor="#b8c0cb" />
+            <stop offset="78%" stopColor="#dfe5eb" />
+            <stop offset="100%" stopColor="#bcc4cf" />
+          </linearGradient>
+
+          {/* Soft glass highlight */}
+          <linearGradient id="tankGlossGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="rgba(255,255,255,0)" />
+            <stop offset="30%" stopColor="rgba(255,255,255,0.34)" />
+            <stop offset="52%" stopColor="rgba(255,255,255,0.10)" />
+            <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+          </linearGradient>
+
+          {/* Liquid */}
+          <linearGradient id="liquidGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor={color} stopOpacity="0.72" />
+            <stop offset="100%" stopColor={color} stopOpacity="1" />
+          </linearGradient>
+
+          {/* Liquid side depth shading */}
+          <linearGradient id="liquidSideGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="rgba(255,255,255,0.18)" />
+            <stop offset="35%" stopColor="rgba(255,255,255,0.02)" />
+            <stop offset="70%" stopColor="rgba(0,0,0,0.10)" />
+            <stop offset="100%" stopColor="rgba(0,0,0,0.18)" />
+          </linearGradient>
+
+          {/* Liquid top surface gradient (looks like curved surface) */}
+          <radialGradient id="liquidTopGrad" cx="50%" cy="35%" r="75%">
+            <stop offset="0%" stopColor="rgba(255,255,255,0.35)" />
+            <stop offset="45%" stopColor="rgba(255,255,255,0.10)" />
+            <stop offset="100%" stopColor="rgba(0,0,0,0.12)" />
+          </radialGradient>
+
+          {/* Clip everything to inside the cylindrical body */}
+          <clipPath id="tankClip">
+            <rect x={bodyX} y={bodyY} width={bodyW} height={bodyH} />
+          </clipPath>
+        </defs>
+
+        {/* Floor shadow */}
+        <ellipse cx={cx} cy={171} rx={37} ry={11} fill="rgba(0,0,0,0.10)" />
+
+        {/* BACK TOP HALF (rear rim) */}
+        <path
+          d={`M ${cx - rx} ${topY} A ${rx} ${ry} 0 0 1 ${cx + rx} ${topY}`}
+          fill="none"
+          stroke="#aeb7c3"
+          strokeWidth="2"
+        />
+
+        {/* Cylinder body */}
+        <rect
+          x={bodyX}
+          y={bodyY}
+          width={bodyW}
+          height={bodyH}
+          fill="url(#tankBodyGrad)"
+          stroke="#b8c0cb"
+          strokeWidth="1.5"
+        />
+
+        {/* Side gloss */}
+        <rect
+          x={bodyX + 8}
+          y={bodyY + 2}
+          width="16"
+          height={bodyH - 4}
+          fill="url(#tankGlossGrad)"
+          opacity="0.95"
+        />
+
+        {/* Liquid inside body (3D) */}
+        <g clipPath="url(#tankClip)">
+          {/* Liquid volume (matches cylinder + curved bottom) */}
+          {p > 0 ? (
+            <>
+              {/* Main liquid body */}
+              <path
+                d={[
+                  `M ${bodyX} ${liquidTopY}`,
+                  `L ${bodyX + bodyW} ${liquidTopY}`,
+                  `L ${bodyX + bodyW} ${bottomY}`,
+                  `A ${rx} ${ry} 0 0 1 ${bodyX} ${bottomY}`,
+                  `Z`,
+                ].join(' ')}
+                fill="url(#liquidGrad)"
+              />
+
+              {/* Liquid side shading (gives cylinder depth) */}
+              <path
+                d={[
+                  `M ${bodyX} ${liquidTopY}`,
+                  `L ${bodyX + bodyW} ${liquidTopY}`,
+                  `L ${bodyX + bodyW} ${bottomY}`,
+                  `A ${rx} ${ry} 0 0 1 ${bodyX} ${bottomY}`,
+                  `Z`,
+                ].join(' ')}
+                fill="url(#liquidSideGrad)"
+                opacity="0.55"
+              />
+
+              {/* Curved liquid top surface (meniscus) */}
+              <ellipse
+                cx={cx}
+                cy={liquidTopY}
+                rx={rx}
+                ry={ry}
+                fill="url(#liquidTopGrad)"
+                opacity="0.95"
+              />
+
+              {/* Front rim highlight on liquid top */}
+              <path
+                d={`M ${cx - rx} ${liquidTopY} A ${rx} ${ry} 0 0 0 ${cx + rx} ${liquidTopY}`}
+                fill="none"
+                stroke="rgba(255,255,255,0.35)"
+                strokeWidth="2"
+              />
+
+              {/* Back rim shadow on liquid top */}
+              <path
+                d={`M ${cx - rx} ${liquidTopY} A ${rx} ${ry} 0 0 1 ${cx + rx} ${liquidTopY}`}
+                fill="none"
+                stroke="rgba(0,0,0,0.10)"
+                strokeWidth="2"
+              />
+            </>
+          ) : null}
+
+          {/* subtle internal base shadow for depth */}
+          <ellipse
+            cx={cx}
+            cy={bottomY - 1}
+            rx={rx}
+            ry={ry}
+            fill="rgba(0,0,0,0.06)"
+          />
+        </g>
+
+        {/* TOP ELLIPSE SURFACE */}
+        <ellipse
+          cx={cx}
+          cy={topY}
+          rx={rx}
+          ry={ry}
+          fill="rgba(210,218,226,0.45)"
+        />
+
+        {/* FRONT TOP HALF (front rim) */}
+        <path
+          d={`M ${cx - rx} ${topY} A ${rx} ${ry} 0 0 0 ${cx + rx} ${topY}`}
+          fill="none"
+          stroke="#b8c0cb"
+          strokeWidth="2"
+        />
+
+        {/* Optional inner top lip */}
+        <path
+          d={`M ${cx - rx + 6} ${topY + 1} A ${rx - 6} ${ry - 5} 0 0 0 ${cx + rx - 6} ${topY + 1}`}
+          fill="none"
+          stroke="rgba(120,130,145,0.22)"
+          strokeWidth="1.3"
+        />
+
+        {/* BOTTOM FRONT HALF ONLY — no opaque fill */}
+        <path
+          d={`M ${cx - rx} ${bottomY} A ${rx} ${ry} 0 0 0 ${cx + rx} ${bottomY}`}
+          fill="none"
+          stroke="#b8c0cb"
+          strokeWidth="2.2"
+        />
+
+        {/* Very subtle back/base hint */}
+        <path
+          d={`M ${cx - rx} ${bottomY} A ${rx} ${ry} 0 0 1 ${cx + rx} ${bottomY}`}
+          fill="none"
+          stroke="rgba(150,160,175,0.18)"
+          strokeWidth="1.2"
+        />
+      </svg>
+    )
+  }
+
+  return (
+    <WidgetShell title={title}>
+      {items.length === 0 ? (
+        <div style={{ fontSize: 12, opacity: 0.8 }}>No tanks returned for this selection.</div>
+      ) : (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(${cols}, minmax(220px, 1fr))`,
+            gap: 12,
+          }}
+        >
+          {items.map((r) => {
+            const name = r?.tank_asset_name || r?.tank_asset_code || 'Tank'
+            const code = r?.tank_asset_code || ''
+            const percent = Number(r?.fill_percent || 0)
+            const color = pctColor(percent)
+
+            return (
+              <div
+                key={code || name}
+                style={{
+                  border: '1px solid #e5e7eb',
+                  borderRadius: 12,
+                  padding: 12,
+                  height: cardHeight,
+                  display: 'flex',
+                  gap: 12,
+                  alignItems: 'center',
+                }}
+              >
+                <TankSvg percent={percent} color={color} />
+
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 800, fontSize: 13, color: '#111827' }}>
+                    {name}
+                  </div>
+                  <div style={{ fontSize: 12, opacity: 0.75, marginTop: 2 }}>
+                    {code}
+                  </div>
+
+                  {showPercent ? (
+                    <div style={{ marginTop: 10, fontSize: 14, fontWeight: 800, color }}>
+                      {percent.toFixed(1)}%
+                    </div>
+                  ) : null}
+
+                  <div style={{ marginTop: 8, fontSize: 12, lineHeight: 1.6 }}>
+                    {showStock ? (
+                      <div>
+                        <strong>Stock:</strong> {fmt(r?.stock_value)} {unit}
+                      </div>
+                    ) : null}
+
+                    {showCapacity ? (
+                      <div>
+                        <strong>Capacity:</strong> {fmt(r?.capacity_value)} {unit}
+                      </div>
+                    ) : null}
+
+                    {showEmpty ? (
+                      <div>
+                        <strong>Empty:</strong> {fmt(r?.empty_value)} {unit}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </WidgetShell>
+  )
+}
+
 const TextWidget = ({ title, body }) => {
   const text = safeString(body)
   return (
@@ -373,6 +685,20 @@ const DataWidget = ({ widgetId, widget, selectedLocationCode, allowedParamsByCod
           <div style={{ color: 'red', fontSize: 12 }}>{state.error}</div>
         ) : (
           renderEChart({ chartType, rows: state.rows, xField, yField })
+        )}
+      </WidgetShell>
+    )
+  }
+
+  if (type === 'TANK_VISUAL') {
+    return (
+      <WidgetShell title={title}>
+        {state.loading ? (
+          <div style={{ fontSize: 12, opacity: 0.8 }}>Loading…</div>
+        ) : state.error ? (
+          <div style={{ color: 'red', fontSize: 12 }}>{state.error}</div>
+        ) : (
+          <TankVisualWidget title={title} rows={state.rows} config={widget?.config || {}} />
         )}
       </WidgetShell>
     )

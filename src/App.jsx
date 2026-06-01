@@ -51,6 +51,8 @@ import Dashboard from './pages/Dashboard'
 import DashboardBuilder from './pages/DashboardBuilder'
 import VesselOperationMaster from './pages/VesselOperationMaster'
 import MovementMapping from './pages/MovementMapping'
+import FlowmeterConfigMaster from './pages/FlowmeterConfigMaster'
+import FlowmeterRecordEntry from './pages/FlowmeterRecordEntry'
 
 import { getCurrentUser, logoutUser } from './api/authApi'
 import { getLocationOperationAvailability } from './api/locationOperationAvailabilityApi'
@@ -644,6 +646,22 @@ function AppContent({
             }
           />
           <Route
+            path="/flowmeter-configs"
+            element={
+              <PermissionGuard
+                loggedInUser={loggedInUser}
+                requiredPermission="View Flowmeter Config"
+                fallbackMessage="You do not have permission to view Flowmeter Config."
+              >
+                <FlowmeterConfigMaster
+                  locations={locations}
+                  assets={assets}
+                  assetAssignments={assetAssignments}
+                />
+              </PermissionGuard>
+            }
+          />
+          <Route
             path="/company-report-profiles"
             element={
               <PermissionGuard
@@ -934,6 +952,21 @@ function AppContent({
               >
                 <OperationTransactionRegister
                   operationTypes={operationTypes}
+                  locations={locations}
+                  assets={assets}
+                />
+              </PermissionGuard>
+            }
+          />
+          <Route
+            path="/flowmeter-records"
+            element={
+              <PermissionGuard
+                loggedInUser={loggedInUser}
+                requiredPermission="View Flowmeter Record"
+                fallbackMessage="You do not have permission to view Flowmeter Records."
+              >
+                <FlowmeterRecordEntry
                   locations={locations}
                   assets={assets}
                 />

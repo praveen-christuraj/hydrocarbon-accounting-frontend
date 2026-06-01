@@ -247,6 +247,125 @@ const isShuttlePayloadField = (field) => {
   return field.fieldCode === 'shuttle_payload'
 }
 
+const getFlowmeterPayloadFromTransaction = (transaction) => {
+  if (!transaction || !Array.isArray(transaction.fieldValues)) {
+    return null
+  }
+
+  const payloadField = transaction.fieldValues.find((field) => {
+    return field.fieldCode === 'flowmeter_payload'
+  })
+
+  if (!payloadField || !payloadField.fieldValue) {
+    return null
+  }
+
+  if (typeof payloadField.fieldValue === 'object') {
+    return payloadField.fieldValue
+  }
+
+  const rawValue = String(payloadField.fieldValue || '').trim()
+
+  if (rawValue === '' || rawValue === '[object Object]') {
+    return null
+  }
+
+  try {
+    return JSON.parse(rawValue)
+  } catch {
+    return null
+  }
+}
+
+const isFlowmeterPayloadField = (field) => {
+  return field.fieldCode === 'flowmeter_payload'
+}
+
+function FlowmeterCalculatedSummary({ payload }) {
+  if (!payload) return null
+
+  const inputs = payload.inputs || {}
+  const calculated = payload.calculated || {}
+  const meters = Array.isArray(inputs.meters) ? inputs.meters : []
+  const isStreamPayload = meters.length > 0
+
+  const Row = ({ label, value, unit = '' }) => (
+    <div className="live-calculation-card">
+      <span>{label}</span>
+      <strong>{formatValue(value)}{unit ? ` ${unit}` : ''}</strong>
+    </div>
+  )
+
+  return (
+    <>
+      <div className="section-title compact-section-title">
+        <h3>Flowmeter Input Review</h3>
+      </div>
+
+      <div className="approval-review-grid">
+        <div><span>Date</span><strong>{inputs.reading_date || '-'}</strong></div>
+        <div><span>Time</span><strong>{inputs.event_time || '-'}</strong></div>
+        <div><span>{isStreamPayload ? 'Stream' : 'Meter'}</span><strong>{inputs.stream_name || inputs.meter_label || '-'}</strong></div>
+        <div><span>{isStreamPayload ? 'Meters' : 'Opening'}</span><strong>{isStreamPayload ? meters.length : formatValue(inputs.opening_reading)}</strong></div>
+        <div><span>{isStreamPayload ? 'Opening Sum' : 'Closing'}</span><strong>{isStreamPayload ? formatValue(meters.reduce((s, m) => s + Number(m.opening_reading || 0), 0)) : formatValue(inputs.closing_reading)}</strong></div>
+        <div><span>{isStreamPayload ? 'Closing Sum' : 'Meter Factor'}</span><strong>{isStreamPayload ? formatValue(meters.reduce((s, m) => s + Number(m.closing_reading || 0), 0)) : formatValue(inputs.meter_factor)}</strong></div>
+        <div><span>Meter Unit</span><strong>{isStreamPayload ? 'Mixed/Configured' : (inputs.meter_unit || '-')}</strong></div>
+        <div><span>Observed Type</span><strong>{inputs.observed_input_type || '-'}</strong></div>
+        <div><span>Observed API</span><strong>{formatValue(inputs.observed_api)}</strong></div>
+        <div><span>Observed Density</span><strong>{formatValue(inputs.observed_density)} kg/m³</strong></div>
+        <div><span>Tank Temperature</span><strong>{formatValue(inputs.tank_temperature)} °{inputs.tank_temperature_unit || ''}</strong></div>
+        <div><span>Sample Temperature</span><strong>{formatValue(inputs.sample_temperature)} °{inputs.sample_temperature_unit || ''}</strong></div>
+        <div><span>BS&W</span><strong>{formatValue(inputs.bsw_percent)}%</strong></div>
+        <div><span>Remarks</span><strong>{inputs.remarks || '-'}</strong></div>
+      </div>
+
+      {isStreamPayload ? (
+        <table style={{ marginTop: 10 }}>
+          <thead>
+            <tr>
+              <th>Meter</th>
+              <th>Factor</th>
+              <th>Unit</th>
+              <th>Opening</th>
+              <th>Closing</th>
+              <th>Gross Obs</th>
+              <th>Gross (BBL)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {meters.map((m, idx) => (
+              <tr key={`${m.config_id || m.meter_label || 'm'}-${idx}`}>
+                <td>{m.meter_label || '-'}</td>
+                <td>{formatValue(m.meter_factor)}</td>
+                <td>{m.meter_unit || '-'}</td>
+                <td>{formatValue(m.opening_reading)}</td>
+                <td>{formatValue(m.closing_reading)}</td>
+                <td>{formatValue(m.gross_observed)}</td>
+                <td>{formatValue(m.gross_observed_bbl)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : null}
+
+      <div className="section-title compact-section-title">
+        <h3>Flowmeter Calculated Values</h3>
+      </div>
+
+      <div className="live-calculation-grid tank-live-grid">
+        <Row label={isStreamPayload ? 'Stream Gross Observed' : 'Delta'} value={isStreamPayload ? calculated.stream_gross_observed : calculated.delta} unit={isStreamPayload ? '' : undefined} />
+        <Row label="Gross Observed" value={calculated.gross_observed} unit={inputs.meter_unit || ''} />
+        <Row label="Gross (BBL)" value={calculated.gross_observed_bbl} unit="bbl" />
+        <Row label="API @ 60°F" value={calculated.api60} />
+        <Row label="VCF" value={calculated.vcf} />
+        <Row label="GSV (BBL)" value={calculated.gsv_bbl} unit="bbl" />
+        <Row label="BSW Vol (BBL)" value={calculated.bsw_bbl} unit="bbl" />
+        <Row label="NSV (BBL)" value={calculated.nsv_bbl} unit="bbl" />
+      </div>
+    </>
+  )
+}
+
 function TankCalculatedSummary({ calculated }) {
   return (
     <div className="live-calculation-grid tank-live-grid">
@@ -509,6 +628,7 @@ function ReviewConfirmationModal({
   tankPayload,
   multiTankPayload,
   shuttlePayload,
+  flowmeterPayload,
   nextStatus,
   remarks,
   onRemarksChange,
@@ -671,6 +791,8 @@ function ReviewConfirmationModal({
           </>
         ) : shuttlePayload ? (
           <ShuttleCalculatedSummary payload={shuttlePayload} />
+        ) : flowmeterPayload ? (
+          <FlowmeterCalculatedSummary payload={flowmeterPayload} />
         ) : (
           <div className="info-box">
             No asset-specific payload found. Please review the saved field values below before confirming.
@@ -1547,6 +1669,10 @@ function OperationTransactionDetail({ loggedInUser }) {
     return getShuttlePayloadFromTransaction(transaction)
   }, [transaction])
 
+  const flowmeterPayload = useMemo(() => {
+    return getFlowmeterPayloadFromTransaction(transaction)
+  }, [transaction])
+
   const hasTankerPayload = (transaction?.fieldValues || []).some((value) => {
     return value.fieldCode === 'tanker_payload'
   })
@@ -1983,6 +2109,10 @@ function OperationTransactionDetail({ loggedInUser }) {
       return <small>Hidden - Shuttle payload is shown above.</small>
     }
 
+    if (isFlowmeterPayloadField(field)) {
+      return <small>Hidden - Flowmeter payload is shown above.</small>
+    }
+
     if (typeof field.fieldValue === 'object') {
       return <small>Structured JSON payload</small>
     }
@@ -2073,6 +2203,7 @@ function OperationTransactionDetail({ loggedInUser }) {
         tankPayload={tankPayload}
         multiTankPayload={multiTankPayload}
         shuttlePayload={shuttlePayload}
+        flowmeterPayload={flowmeterPayload}
         nextStatus={pendingStatus}
         remarks={pendingRemarks}
         onRemarksChange={setPendingRemarks}
@@ -2271,6 +2402,14 @@ function OperationTransactionDetail({ loggedInUser }) {
           </div>
 
           <MultiTankCalculatedSummary payload={multiTankPayload} />
+        </div>
+      ) : flowmeterPayload ? (
+        <div className="operation-special-layout tank-gauging-layout">
+          <div className="operation-special-layout-header">
+            <h3>Flowmeter Reading Data</h3>
+            <p>Saved flowmeter input values and calculated quantities for this ticket.</p>
+          </div>
+          <FlowmeterCalculatedSummary payload={flowmeterPayload} />
         </div>
       ) : (
         <div className="info-box">
