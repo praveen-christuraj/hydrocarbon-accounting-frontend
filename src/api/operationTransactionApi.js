@@ -1,4 +1,4 @@
-import { apiGet, apiPatch } from './apiClient'
+import { apiGet, apiPatch, apiPost } from './apiClient'
 import { getStoredAccessToken } from './authApi'
 
 const convertOperationTransactionFromApi = (item) => {
@@ -148,6 +148,21 @@ export const updateOperationTransactionStatus = async (
 export const getOperationTransactionStatusHistory = async (transactionId) => {
   const data = await apiGet(`/operation-transactions/${transactionId}/status-history`)
   return data.map(convertStatusHistoryFromApi)
+}
+
+export const getOperationTransactionCorrectionRequests = async (transactionId) => {
+  return apiGet(`/operation-transactions/${transactionId}/correction-requests`)
+}
+
+export const createOperationTransactionCorrectionRequest = async (
+  transactionId,
+  payload
+) => {
+  return apiPost(`/operation-transactions/${transactionId}/correction-requests`, {
+    request_type: payload.requestType,
+    suggested_action: payload.suggestedAction,
+    reason: payload.reason,
+  })
 }
 
 export const checkOperationWorkflowPolicy = async (payload) => {

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
+  createOperationTransactionCorrectionRequest,
+  getOperationTransactionCorrectionRequests,
   getOperationTransactionDetail,
   updateOperationTransactionStatus,
   getOperationTransactionStatusHistory,
@@ -1576,8 +1578,16 @@ function OperationTransactionDetail({ loggedInUser }) {
 
   const [transaction, setTransaction] = useState(null)
   const [statusHistory, setStatusHistory] = useState([])
+  const [correctionRequests, setCorrectionRequests] = useState([])
   const [loading, setLoading] = useState(false)
   const [statusLoading, setStatusLoading] = useState(false)
+  const [correctionLoading, setCorrectionLoading] = useState(false)
+  const [showCorrectionForm, setShowCorrectionForm] = useState(false)
+  const [correctionForm, setCorrectionForm] = useState({
+    requestType: 'Data Correction',
+    suggestedAction: 'Reopen for Edit',
+    reason: '',
+  })
 
   const [pendingStatus, setPendingStatus] = useState('')
   const [pendingRemarks, setPendingRemarks] = useState('')
@@ -1658,6 +1668,9 @@ function OperationTransactionDetail({ loggedInUser }) {
   const canApproveTransactionBase = hasPermission('Approve Operation Transaction')
   const canRejectTransactionBase = hasPermission('Reject Operation Transaction')
   const canCancelTransactionBase = hasPermission('Cancel Operation Transaction')
+  const canRequestApprovedCorrection =
+    hasPermission('Request Approved Transaction Correction') ||
+    canApproveTransactionBase
 
   const canSubmitTransaction =
     canSubmitTransactionBase && (workflowActionAllow.SUBMIT ?? true)
@@ -1713,9 +1726,19 @@ function OperationTransactionDetail({ loggedInUser }) {
     }
   }
 
+  const loadCorrectionRequests = async () => {
+    try {
+      const data = await getOperationTransactionCorrectionRequests(transactionId)
+      setCorrectionRequests(data || [])
+    } catch (error) {
+      setCorrectionRequests([])
+    }
+  }
+
   useEffect(() => {
     loadTransactionDetail()
     loadStatusHistory()
+    loadCorrectionRequests()
     reloadReportProfiles()
   }, [transactionId])
 
@@ -2012,6 +2035,71 @@ function OperationTransactionDetail({ loggedInUser }) {
     }
   }
 
+  const pendingCorrectionRequest = correctionRequests.find((request) => {
+    return request.status === 'Pending Admin Review'
+  })
+
+  const latestApprovalTime = statusHistory
+    .filter((item) => item.newStatus === 'Approved' && item.changedAt)
+    .map((item) => new Date(item.changedAt))
+    .filter((item) => !Number.isNaN(item.getTime()))
+    .sort((left, right) => right.getTime() - left.getTime())[0]
+
+  const approvedCorrectionDeadline = latestApprovalTime
+    ? new Date(latestApprovalTime.getTime() + 24 * 60 * 60 * 1000)
+    : null
+
+  const approvedCorrectionExpired =
+    transaction?.status === 'Approved' &&
+    approvedCorrectionDeadline &&
+    new Date() > approvedCorrectionDeadline
+
+  const handleCorrectionFormChange = (fieldName, value) => {
+    setCorrectionForm((current) => ({
+      ...current,
+      [fieldName]: value,
+    }))
+  }
+
+  const submitCorrectionRequest = async () => {
+    if (!transaction || transaction.status !== 'Approved') {
+      alert('Only approved tickets can be marked for correction.')
+      return
+    }
+
+    if (!canRequestApprovedCorrection) {
+      alert('You need approval access to request approved transaction correction.')
+      return
+    }
+
+    if (approvedCorrectionExpired) {
+      alert('Approved transaction correction window expired after 24 hours.')
+      return
+    }
+
+    if (correctionForm.reason.trim() === '') {
+      alert('Reason / justification is required.')
+      return
+    }
+
+    try {
+      setCorrectionLoading(true)
+      await createOperationTransactionCorrectionRequest(transaction.id, correctionForm)
+      await loadCorrectionRequests()
+      setShowCorrectionForm(false)
+      setCorrectionForm({
+        requestType: 'Data Correction',
+        suggestedAction: 'Reopen for Edit',
+        reason: '',
+      })
+      alert('Approved transaction correction request sent to admin.')
+    } catch (error) {
+      alert(error.message)
+    } finally {
+      setCorrectionLoading(false)
+    }
+  }
+
   const renderDisabledMessage = (message) => {
     return <span className="warning-text">{message}</span>
   }
@@ -2126,6 +2214,36 @@ function OperationTransactionDetail({ loggedInUser }) {
             </button>
           )}
         </>
+      )
+    }
+
+    if (transaction.status === 'Approved') {
+      if (approvedCorrectionExpired) {
+        return renderDisabledMessage(
+          'Approved ticket correction window expired after 24 hours. No further correction action allowed.'
+        )
+      }
+
+      if (!canRequestApprovedCorrection) {
+        return renderDisabledMessage(
+          'Approved ticket is locked. Approval access is required to request correction.'
+        )
+      }
+
+      if (pendingCorrectionRequest) {
+        return renderDisabledMessage(
+          `Correction request ${pendingCorrectionRequest.request_number} is pending admin review.`
+        )
+      }
+
+      return (
+        <button
+          type="button"
+          onClick={() => setShowCorrectionForm((current) => !current)}
+          disabled={statusLoading || correctionLoading}
+        >
+          Mark Approved Ticket for Correction
+        </button>
       )
     }
 
@@ -2477,7 +2595,156 @@ function OperationTransactionDetail({ loggedInUser }) {
           {renderStatusActions()}
           {statusLoading && <span className="warning-text">Updating...</span>}
         </div>
+        {transaction.status === 'Approved' && (
+          <div className="muted-table-text" style={{ marginTop: 8 }}>
+            Correction window:{' '}
+            {approvedCorrectionDeadline
+              ? `open until ${approvedCorrectionDeadline.toLocaleString()}`
+              : 'approval time not available'}
+          </div>
+        )}
       </div>
+
+      {showCorrectionForm && transaction.status === 'Approved' && (
+        <div className="info-box">
+          <strong>Approved Transaction Correction Request</strong>
+          <p>
+            This does not edit the approved ticket. It creates an admin revoke
+            task so approval can be safely revoked and the ticket can return to
+            the normal submitted review flow.
+          </p>
+
+          <div className="filter-panel">
+            <div>
+              <label>Correction Type</label>
+              <select
+                value={correctionForm.requestType}
+                onChange={(e) =>
+                  handleCorrectionFormChange('requestType', e.target.value)
+                }
+                disabled={correctionLoading}
+              >
+                <option>Data Correction</option>
+                <option>Quantity Correction</option>
+                <option>Wrong Asset / Location</option>
+                <option>Wrong Date / Time</option>
+                <option>Duplicate / Soft Delete Required</option>
+                <option>Other</option>
+              </select>
+            </div>
+
+            <div>
+              <label>Suggested Action</label>
+              <select
+                value={correctionForm.suggestedAction}
+                onChange={(e) =>
+                  handleCorrectionFormChange('suggestedAction', e.target.value)
+                }
+                disabled={correctionLoading}
+              >
+                <option>Reopen for Edit</option>
+                <option>Reopen for Cancellation</option>
+                <option>Reopen for Re-approval</option>
+                <option>Operational Review Required</option>
+              </select>
+            </div>
+
+            <div className="full-width-field">
+              <label>Reason / Justification</label>
+              <textarea
+                rows="4"
+                value={correctionForm.reason}
+                onChange={(e) =>
+                  handleCorrectionFormChange('reason', e.target.value)
+                }
+                placeholder="Explain why this approved ticket needs attention."
+                disabled={correctionLoading}
+              />
+            </div>
+          </div>
+
+          <div className="form-actions">
+            <button
+              type="button"
+              onClick={submitCorrectionRequest}
+              disabled={correctionLoading}
+            >
+              {correctionLoading ? 'Sending...' : 'Send to Admin'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowCorrectionForm(false)}
+              disabled={correctionLoading}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="section-title">
+        <h3>Correction / Revoke Requests</h3>
+        <p>
+          Approved-ticket correction requests and admin revoke decisions for
+          this transaction.
+        </p>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Request No.</th>
+            <th>Type</th>
+            <th>Suggested Action</th>
+            <th>Status</th>
+            <th>Requested By</th>
+            <th>Requested At</th>
+            <th>Admin Action</th>
+            <th>Reason / Remarks</th>
+          </tr>
+        </thead>
+        <tbody>
+          {correctionRequests.length === 0 ? (
+            <tr>
+              <td colSpan="8" className="empty-table">
+                No correction requests found for this transaction.
+              </td>
+            </tr>
+          ) : (
+            correctionRequests.map((request) => (
+              <tr key={request.id}>
+                <td>{request.request_number}</td>
+                <td>{request.request_type}</td>
+                <td>{request.suggested_action}</td>
+                <td>
+                  <span
+                    className={`status-badge ${String(request.status || '')
+                      .toLowerCase()
+                      .replace(/\s+/g, '-')}`}
+                  >
+                    {request.status}
+                  </span>
+                </td>
+                <td>{request.requested_by_display || '-'}</td>
+                <td>
+                  {request.requested_at
+                    ? new Date(request.requested_at).toLocaleString()
+                    : '-'}
+                </td>
+                <td>{request.admin_action || '-'}</td>
+                <td>
+                  <strong>{request.reason}</strong>
+                  {request.admin_remarks && (
+                    <div className="muted-table-text">
+                      Admin: {request.admin_remarks}
+                    </div>
+                  )}
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
 
       <div className="section-title">
         <h3>Saved Field Values</h3>

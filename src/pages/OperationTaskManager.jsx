@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
+  adminRejectApprovedRevokeTask,
+  adminRevokeApprovedTransactionTask,
   approveOperationTask,
   getMyOperationTasks,
   getOperationTaskEvents,
@@ -111,6 +113,24 @@ function OperationTaskManager({ reloadOperationTransactions }) {
       } else if (action === 'reject') {
         if (!window.confirm('Reject the linked operation ticket?')) return
         await rejectOperationTask(selectedTask.id, remarks || 'Rejected from Task Manager')
+      } else if (action === 'admin-revoke-approved') {
+        if (
+          !window.confirm(
+            'Admin revoke will move the approved ticket back to Submitted and reverse derived ledger rows. Continue?'
+          )
+        ) {
+          return
+        }
+        await adminRevokeApprovedTransactionTask(
+          selectedTask.id,
+          remarks || 'Admin revoked approved transaction for correction'
+        )
+      } else if (action === 'admin-reject-revoke') {
+        if (!window.confirm('Reject this approved transaction revoke request?')) return
+        await adminRejectApprovedRevokeTask(
+          selectedTask.id,
+          remarks || 'Admin rejected approved transaction revoke request'
+        )
       }
 
       await loadTasks()
@@ -131,6 +151,11 @@ function OperationTaskManager({ reloadOperationTransactions }) {
   const canAct =
     selectedTask &&
     selectedTask.taskType === 'OPERATION_APPROVAL' &&
+    ['Pending', 'In Progress'].includes(selectedTask.status)
+
+  const canActOnApprovedRevoke =
+    selectedTask &&
+    selectedTask.taskType === 'APPROVED_TRANSACTION_REVOKE_REQUEST' &&
     ['Pending', 'In Progress'].includes(selectedTask.status)
 
   return (
@@ -194,6 +219,9 @@ function OperationTaskManager({ reloadOperationTransactions }) {
           >
             <option value="ALL">All Task Types</option>
             <option value="OPERATION_APPROVAL">Operation Approval</option>
+            <option value="APPROVED_TRANSACTION_REVOKE_REQUEST">
+              Approved Transaction Revoke
+            </option>
             <option value="PASSWORD_RESET_REQUEST">Password Reset Request</option>
           </select>
         </div>
@@ -310,6 +338,7 @@ function OperationTaskManager({ reloadOperationTransactions }) {
           <div>Asset: {selectedTask.primaryAssetCode}</div>
           <div>Location: {selectedTask.locationCode}</div>
           <div>Status: {selectedTask.status}</div>
+          {selectedTask.remarks && <div>Task Notes: {selectedTask.remarks}</div>}
 
           {selectedTask.transactionId ? (
             <div className="form-actions">
@@ -345,6 +374,34 @@ function OperationTaskManager({ reloadOperationTransactions }) {
                 </button>
                 <button type="button" onClick={() => runAction('reject')} disabled={loading}>
                   Reject
+                </button>
+              </div>
+            </>
+          )}
+
+          {canActOnApprovedRevoke && (
+            <>
+              <label>Admin Action Remarks</label>
+              <textarea
+                rows="3"
+                value={remarks}
+                onChange={(e) => setRemarks(e.target.value)}
+                placeholder="Enter admin revoke/reject remarks"
+              />
+              <div className="form-actions">
+                <button
+                  type="button"
+                  onClick={() => runAction('admin-revoke-approved')}
+                  disabled={loading}
+                >
+                  Admin Revoke Approval
+                </button>
+                <button
+                  type="button"
+                  onClick={() => runAction('admin-reject-revoke')}
+                  disabled={loading}
+                >
+                  Reject Revoke Request
                 </button>
               </div>
             </>

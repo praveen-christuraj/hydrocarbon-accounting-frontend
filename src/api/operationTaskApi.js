@@ -90,3 +90,15 @@ export const approveOperationTask = async (taskId, remarks = '') => {
 export const rejectOperationTask = async (taskId, remarks = '') => {
   return apiPost(`/operation-tasks/${taskId}/reject`, { remarks })
 }
+
+export const adminRevokeApprovedTransactionTask = async (taskId, remarks = '') => {
+  return apiPost(`/operation-tasks/${taskId}/admin-revoke-approved-transaction`, {
+    remarks,
+  })
+}
+
+export const adminRejectApprovedRevokeTask = async (taskId, remarks = '') => {
+  return apiPost(`/operation-tasks/${taskId}/admin-reject-approved-revoke`, {
+    remarks,
+  })
+}
