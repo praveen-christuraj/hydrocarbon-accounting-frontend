@@ -6,6 +6,7 @@ import {
   deleteOperationEntry,
   updateOperationEntry,
 } from '../api/operationEntryApi'
+import { getOperationTemplateLayouts } from '../api/operationTemplateApi'
 import TankGaugingLayout from '../components/operationLayouts/TankGaugingLayout'
 import MultiTankBeforeAfterLayout from '../components/operationLayouts/MultiTankBeforeAfterLayout'
 import TankerTruckLayout from '../components/operationLayouts/TankerTruckLayout'
@@ -159,6 +160,119 @@ function OperationTemplateFields({
   )
 }
 
+function OperationTemplateStructuredFields({
+  entry,
+  selectedTemplateFields,
+  templateLayout,
+  handleValueChange,
+  getInputType,
+}) {
+  if (!templateLayout || !Array.isArray(templateLayout.items)) {
+    return null
+  }
+
+  const valueByFieldCode = new Map((entry.values || []).map((v) => [v.fieldCode, v]))
+  const fieldById = new Map((selectedTemplateFields || []).map((f) => [Number(f.id), f]))
+  const sectionBuckets = (templateLayout.sections || []).map((section) => {
+    return {
+      ...section,
+      items: [],
+    }
+  })
+  const sectionBucketById = new Map(sectionBuckets.map((s) => [Number(s.id), s]))
+
+  ;(templateLayout.items || []).forEach((item) => {
+    const sectionBucket = sectionBucketById.get(Number(item.sectionId))
+    const field = fieldById.get(Number(item.fieldId))
+    if (!sectionBucket || !field) return
+    const value = valueByFieldCode.get(field.fieldCode)
+    if (!value) return
+    sectionBucket.items.push({ item, field, value })
+  })
+
+  const renderedSections = sectionBuckets
+    .map((section) => ({
+      ...section,
+      items: section.items.sort((a, b) => {
+        const rowDiff = Number(a.item.rowNo || 0) - Number(b.item.rowNo || 0)
+        if (rowDiff !== 0) return rowDiff
+        const colDiff = Number(a.item.colStart || 0) - Number(b.item.colStart || 0)
+        if (colDiff !== 0) return colDiff
+        return Number(a.item.sortOrder || 0) - Number(b.item.sortOrder || 0)
+      }),
+    }))
+    .filter((section) => section.items.length > 0)
+
+  if (renderedSections.length === 0) return null
+
+  return (
+    <div className="full-width-field">
+      <div className="operation-special-layout">
+        <div className="operation-special-layout-header">
+          <h3>Structured Template Fields</h3>
+          <p>Rendered from saved operation template layout configuration.</p>
+        </div>
+
+        {renderedSections.map((section) => {
+          const rows = new Map()
+          section.items.forEach((wrapped) => {
+            const rowNo = Number(wrapped.item.rowNo || 1)
+            if (!rows.has(rowNo)) rows.set(rowNo, [])
+            rows.get(rowNo).push(wrapped)
+          })
+          const sortedRows = [...rows.entries()].sort((a, b) => a[0] - b[0])
+
+          return (
+            <div key={section.id} className="full-width-field">
+              <div className="section-title compact-section-title">
+                <h3>{section.title || section.sectionKey}</h3>
+                <p>Section fields arranged by configured row and column.</p>
+              </div>
+
+              {sortedRows.map(([rowNo, rowItems]) => (
+                <div key={`${section.id}-${rowNo}`} className="layout-preview-grid">
+                  {rowItems
+                    .sort((a, b) => Number(a.item.colStart || 0) - Number(b.item.colStart || 0))
+                    .map(({ item, field, value }) => {
+                      const isRequiredManual =
+                        field?.isRequired === 'Yes' && value.inputMode === 'Manual'
+                      const span = Math.min(Math.max(Number(item.colSpan || 1), 1), 3)
+                      return (
+                        <div key={item.id || `${field.fieldCode}-${rowNo}`} className={`layout-preview-cell span-${span}`}>
+                          <label>
+                            {item.labelOverride || value.fieldName}
+                            {value.unit ? ` (${value.unit})` : ''}
+                            {isRequiredManual ? ' *' : ''}
+                          </label>
+                          <input
+                            type={getInputType(value.dataType)}
+                            value={
+                              typeof value.fieldValue === 'object'
+                                ? JSON.stringify(value.fieldValue)
+                                : value.fieldValue
+                            }
+                            onChange={(e) => handleValueChange(value.fieldCode, e.target.value)}
+                            disabled={value.inputMode !== 'Manual'}
+                            placeholder={
+                              item.placeholderOverride ||
+                              (value.inputMode === 'Manual'
+                                ? `Enter ${value.fieldName}`
+                                : `${value.inputMode} field - populated by system`)
+                            }
+                          />
+                        </div>
+                      )
+                    })}
+                </div>
+              ))}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function OperationLayoutRenderer({
   entry,
   editId,
@@ -175,6 +289,7 @@ function OperationLayoutRenderer({
   senderReferenceLoading = false,
   receiverMode = false,
   setEntryField,
+  templateLayout = null,
 }) {
   if (!selectedTemplate) {
     return (
@@ -463,13 +578,35 @@ function OperationLayoutRenderer({
   }
 
   return (
-    <OperationTemplateFields
-      entry={entry}
-      selectedTemplate={selectedTemplate}
-      selectedTemplateFields={selectedTemplateFields}
-      handleValueChange={handleValueChange}
-      getInputType={getInputType}
-    />
+    <>
+      <OperationTemplateStructuredFields
+        entry={entry}
+        selectedTemplateFields={selectedTemplateFields}
+        templateLayout={templateLayout}
+        handleValueChange={handleValueChange}
+        getInputType={getInputType}
+      />
+
+      <OperationTemplateFields
+        entry={entry}
+        selectedTemplate={selectedTemplate}
+        selectedTemplateFields={selectedTemplateFields}
+        handleValueChange={handleValueChange}
+        getInputType={getInputType}
+        excludedFieldCodes={
+          templateLayout
+            ? (templateLayout.items || [])
+                .map((item) => {
+                  const field = selectedTemplateFields.find(
+                    (f) => Number(f.id) === Number(item.fieldId)
+                  )
+                  return field?.fieldCode || null
+                })
+                .filter(Boolean)
+            : []
+        }
+      />
+    </>
   )
 }
 
@@ -520,6 +657,7 @@ function OperationEntry({
   const [editableSearch, setEditableSearch] = useState('')
   const [editableStatusFilter, setEditableStatusFilter] = useState('ALL') // ALL | Draft | Rejected
   const [editablePage, setEditablePage] = useState(1)
+  const [selectedTemplateLayout, setSelectedTemplateLayout] = useState(null)
   const EDITABLE_PAGE_SIZE = 20
 
   const location = useLocation()
@@ -705,6 +843,27 @@ function OperationEntry({
         .filter((field) => field.status === 'Active')
         .sort((a, b) => Number(a.sortOrder) - Number(b.sortOrder))
     : []
+
+  useEffect(() => {
+    const loadLayout = async () => {
+      setSelectedTemplateLayout(null)
+      if (!selectedTemplate?.id) return
+      if (String(selectedTemplate.entryLayoutType || '').trim() !== 'Standard Form') {
+        return
+      }
+      try {
+        const layouts = await getOperationTemplateLayouts(selectedTemplate.id)
+        if (!Array.isArray(layouts) || layouts.length === 0) return
+        const activeLayouts = layouts.filter((l) => l.status === 'Active')
+        const defaultActive = activeLayouts.find((l) => l.isDefault === 'Yes')
+        const chosen = defaultActive || activeLayouts[0] || layouts[0]
+        setSelectedTemplateLayout(chosen || null)
+      } catch {
+        setSelectedTemplateLayout(null)
+      }
+    }
+    loadLayout()
+  }, [selectedTemplate?.id, selectedTemplate?.entryLayoutType])
 
   const availableAssets = useMemo(() => {
     if (!selectedOperationType) {
@@ -1675,6 +1834,7 @@ function OperationEntry({
           senderReferenceLoading={tankerSenderReferenceLoading}
           receiverMode={prefill.mode === 'tanker-receiver'}
           setEntryField={setEntryField}
+          templateLayout={selectedTemplateLayout}
         />
 
         <div className="form-actions">

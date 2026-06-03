@@ -46,6 +46,12 @@ export const navigationItems = [
         permission: 'View User Role Assignment',
       },
       {
+        label: 'Profile & Security',
+        path: '/profile-security',
+        disabled: false,
+        permission: 'View Own Security Settings',
+      },
+      {
         label: 'Access Summary',
         path: '/access-summary',
         disabled: false,
@@ -160,10 +166,22 @@ export const navigationItems = [
         permission: 'View Operation Template',
       },
       {
+        label: 'Operation Workflow Policy',
+        path: '/operation-workflow-policies',
+        disabled: false,
+        permission: 'View Operation Workflow Policy',
+      },
+      {
         label: 'Operation Entry',
         path: '/operation-entry',
         disabled: false,
         permission: 'Create Operation Entry',
+      },
+      {
+        label: 'Task Manager',
+        path: '/operation-tasks',
+        disabled: false,
+        permission: 'View My Tasks',
       },
       {
         label: 'Barge Tracking',

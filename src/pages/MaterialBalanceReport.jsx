@@ -1,5 +1,8 @@
 import { useMemo, useState } from 'react'
 import { getMaterialBalanceReport } from '../api/materialBalanceReportApi'
+import PaginationControls, {
+  paginateRows,
+} from '../components/common/PaginationControls'
 
 function MaterialBalanceReport({ locations, assets }) {
   const emptyFilters = {
@@ -16,6 +19,7 @@ function MaterialBalanceReport({ locations, assets }) {
   const [columns, setColumns] = useState([])
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
 
   const activeLocations = useMemo(() => {
     return (locations || []).filter((location) => location.status === 'Active')
@@ -128,6 +132,7 @@ function MaterialBalanceReport({ locations, assets }) {
       setTemplate(data.template)
       setColumns(data.columns)
       setRows(data.rows)
+      setCurrentPage(1)
     } catch (error) {
       alert(error.message)
     } finally {
@@ -166,6 +171,7 @@ function MaterialBalanceReport({ locations, assets }) {
     setTemplate(null)
     setColumns([])
     setRows([])
+    setCurrentPage(1)
   }
 
   const formatNumber = (value, decimals = 3) => {
@@ -202,6 +208,8 @@ function MaterialBalanceReport({ locations, assets }) {
 
     return 'NSV'
   }
+
+  const visibleRows = paginateRows(rows, currentPage)
 
   const escapeCsvValue = (value) => {
     if (value === null || value === undefined) {
@@ -556,7 +564,7 @@ function MaterialBalanceReport({ locations, assets }) {
               </td>
             </tr>
           ) : (
-            rows.map((row, index) => (
+            visibleRows.map((row, index) => (
               <tr
                 key={`${row.accountingDate}-${row.tankAssetCode || 'ALL'}-${index}`}
               >
@@ -594,6 +602,12 @@ function MaterialBalanceReport({ locations, assets }) {
           )}
         </tbody>
       </table>
+
+      <PaginationControls
+        currentPage={currentPage}
+        totalRows={rows.length}
+        onPageChange={setCurrentPage}
+      />
 
       <div className="info-box">
         Material Balance is calculated from approved Tank Stock Ledger rows and

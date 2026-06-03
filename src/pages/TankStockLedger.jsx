@@ -4,6 +4,9 @@ import {
   getTankStockLedgerDailySummary,
   getTankStockLedgerSummary,
 } from '../api/tankStockLedgerApi'
+import PaginationControls, {
+  paginateRows,
+} from '../components/common/PaginationControls'
 
 function TankStockLedger({ locations, assets }) {
   const emptyFilters = {
@@ -22,6 +25,9 @@ function TankStockLedger({ locations, assets }) {
   const [dailySummaryRows, setDailySummaryRows] = useState([])
   const [activeView, setActiveView] = useState('daily-summary')
   const [loading, setLoading] = useState(false)
+  const [dailySummaryPage, setDailySummaryPage] = useState(1)
+  const [stockSummaryPage, setStockSummaryPage] = useState(1)
+  const [ledgerDetailsPage, setLedgerDetailsPage] = useState(1)
 
   const activeLocations = useMemo(() => {
     return (locations || []).filter((location) => location.status === 'Active')
@@ -141,6 +147,9 @@ function TankStockLedger({ locations, assets }) {
       setLedgerRows(ledgerData)
       setSummaryRows(summaryData)
       setDailySummaryRows(dailySummaryData)
+      setDailySummaryPage(1)
+      setStockSummaryPage(1)
+      setLedgerDetailsPage(1)
     } catch (error) {
       alert(error.message)
     } finally {
@@ -198,6 +207,13 @@ function TankStockLedger({ locations, assets }) {
 
     return formatNumber(row.movementNsvBbl)
   }
+
+  const visibleDailySummaryRows = paginateRows(
+    dailySummaryRows,
+    dailySummaryPage
+  )
+  const visibleSummaryRows = paginateRows(summaryRows, stockSummaryPage)
+  const visibleLedgerRows = paginateRows(ledgerRows, ledgerDetailsPage)
 
   const escapeCsvValue = (value) => {
     if (value === null || value === undefined) {
@@ -616,7 +632,7 @@ function TankStockLedger({ locations, assets }) {
                   </td>
                 </tr>
               ) : (
-                dailySummaryRows.map((row, index) => (
+                visibleDailySummaryRows.map((row, index) => (
                   <tr
                     key={`${row.accountingDate}-${row.tankAssetCode}-${index}`}
                   >
@@ -651,6 +667,12 @@ function TankStockLedger({ locations, assets }) {
               )}
             </tbody>
           </table>
+
+          <PaginationControls
+            currentPage={dailySummaryPage}
+            totalRows={dailySummaryRows.length}
+            onPageChange={setDailySummaryPage}
+          />
 
           <div className="info-box">
             Daily Summary uses Accounting Date, not calendar midnight. It
@@ -693,7 +715,7 @@ function TankStockLedger({ locations, assets }) {
                   </td>
                 </tr>
               ) : (
-                summaryRows.map((row, index) => (
+                visibleSummaryRows.map((row, index) => (
                   <tr key={index}>
                     <td>
                       {row.locationName} ({row.locationCode})
@@ -713,6 +735,12 @@ function TankStockLedger({ locations, assets }) {
               )}
             </tbody>
           </table>
+
+          <PaginationControls
+            currentPage={stockSummaryPage}
+            totalRows={summaryRows.length}
+            onPageChange={setStockSummaryPage}
+          />
 
           <div className="info-box">
             Stock Summary groups the selected ledger period by location, tank,
@@ -760,7 +788,7 @@ function TankStockLedger({ locations, assets }) {
                   </td>
                 </tr>
               ) : (
-                ledgerRows.map((row) => (
+                visibleLedgerRows.map((row) => (
                   <tr key={row.id}>
                     <td>{row.accountingDate || '-'}</td>
                     <td>{row.operationDate}</td>
@@ -806,6 +834,12 @@ function TankStockLedger({ locations, assets }) {
               )}
             </tbody>
           </table>
+
+          <PaginationControls
+            currentPage={ledgerDetailsPage}
+            totalRows={ledgerRows.length}
+            onPageChange={setLedgerDetailsPage}
+          />
 
           <div className="info-box">
             Ledger rule: Tank Gauging calculated quantities are stock snapshots.

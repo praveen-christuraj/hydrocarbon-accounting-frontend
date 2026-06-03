@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { getOutTurnReport } from '../api/outTurnReportApi'
+import PaginationControls, {
+  paginateRows,
+} from '../components/common/PaginationControls'
 
 function OutTurnReport({ locations, assets }) {
   const emptyFilters = {
@@ -14,6 +17,7 @@ function OutTurnReport({ locations, assets }) {
   const [filters, setFilters] = useState(emptyFilters)
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
 
   const activeLocations = useMemo(() => {
     return (locations || []).filter((location) => location.status === 'Active')
@@ -77,6 +81,7 @@ function OutTurnReport({ locations, assets }) {
 
       const data = await getOutTurnReport(activeFilters)
       setRows(data)
+      setCurrentPage(1)
     } catch (error) {
       alert(error.message)
     } finally {
@@ -148,6 +153,8 @@ function OutTurnReport({ locations, assets }) {
 
     return ''
   }
+
+  const visibleRows = paginateRows(rows, currentPage)
 
   const escapeCsvValue = (value) => {
     if (value === null || value === undefined) {
@@ -504,7 +511,7 @@ function OutTurnReport({ locations, assets }) {
               </td>
             </tr>
           ) : (
-            rows.map((row) => (
+            visibleRows.map((row) => (
               <tr key={row.ledgerId}>
                 <td>{row.accountingDate || '-'}</td>
                 <td>{formatDateTime(row.operationDatetime)}</td>
@@ -544,6 +551,12 @@ function OutTurnReport({ locations, assets }) {
           )}
         </tbody>
       </table>
+
+      <PaginationControls
+        currentPage={currentPage}
+        totalRows={rows.length}
+        onPageChange={setCurrentPage}
+      />
 
       <div className="info-box">
         OTR rule: Tank Gauging values are stock snapshots after the operation.

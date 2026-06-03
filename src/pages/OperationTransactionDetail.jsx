@@ -4,6 +4,7 @@ import {
   getOperationTransactionDetail,
   updateOperationTransactionStatus,
   getOperationTransactionStatusHistory,
+  checkOperationWorkflowPolicy,
 } from '../api/operationTransactionApi'
 
 import { getCompanyReportProfiles } from '../api/companyReportProfileApi'
@@ -1581,6 +1582,7 @@ function OperationTransactionDetail({ loggedInUser }) {
   const [pendingStatus, setPendingStatus] = useState('')
   const [pendingRemarks, setPendingRemarks] = useState('')
   const [pendingReviewConfirmed, setPendingReviewConfirmed] = useState(false)
+  const [workflowActionAllow, setWorkflowActionAllow] = useState({})
   const [reportProfiles, setReportProfiles] = useState([])
   const [selectedReportProfileName, setSelectedReportProfileName] = useState(
     loadSelectedReportProfileName
@@ -1652,10 +1654,21 @@ function OperationTransactionDetail({ loggedInUser }) {
   }
 
   const canViewTransaction = hasPermission('View Operation Transaction')
-  const canSubmitTransaction = hasPermission('Submit Operation Transaction')
-  const canApproveTransaction = hasPermission('Approve Operation Transaction')
-  const canRejectTransaction = hasPermission('Reject Operation Transaction')
-  const canCancelTransaction = hasPermission('Cancel Operation Transaction')
+  const canSubmitTransactionBase = hasPermission('Submit Operation Transaction')
+  const canApproveTransactionBase = hasPermission('Approve Operation Transaction')
+  const canRejectTransactionBase = hasPermission('Reject Operation Transaction')
+  const canCancelTransactionBase = hasPermission('Cancel Operation Transaction')
+
+  const canSubmitTransaction =
+    canSubmitTransactionBase && (workflowActionAllow.SUBMIT ?? true)
+  const canApproveTransaction =
+    canApproveTransactionBase && (workflowActionAllow.APPROVE ?? true)
+  const canRejectTransaction =
+    canRejectTransactionBase && (workflowActionAllow.REJECT ?? true)
+  const canCancelTransaction =
+    canCancelTransactionBase && (workflowActionAllow.CANCEL ?? true)
+  const canRecallTransaction =
+    canSubmitTransactionBase && (workflowActionAllow.RECALL ?? true)
 
   const tankPayload = useMemo(() => {
     return getTankPayloadFromTransaction(transaction)
@@ -1706,6 +1719,33 @@ function OperationTransactionDetail({ loggedInUser }) {
     reloadReportProfiles()
   }, [transactionId])
 
+  useEffect(() => {
+    const loadWorkflowChecks = async () => {
+      if (!transaction?.id) return
+      const payloadBase = {
+        operation_type_code: transaction.operationTypeCode || null,
+        operation_template_id: transaction.operationTemplateId || null,
+        asset_type_code: transaction.primaryAssetTypeCode || null,
+        location_code: transaction.locationCode || null,
+      }
+      const actions = ['SUBMIT', 'APPROVE', 'REJECT', 'CANCEL', 'RECALL']
+      const out = {}
+      for (const action of actions) {
+        try {
+          const res = await checkOperationWorkflowPolicy({
+            action_code: action,
+            ...payloadBase,
+          })
+          out[action] = Boolean(res?.allowed)
+        } catch {
+          out[action] = true
+        }
+      }
+      setWorkflowActionAllow(out)
+    }
+    loadWorkflowChecks()
+  }, [transaction?.id, transaction?.operationTypeCode, transaction?.operationTemplateId, transaction?.primaryAssetTypeCode, transaction?.locationCode])
+
   const getChangedByDisplay = () => {
     if (!loggedInUser) {
       return 'Unknown User'
@@ -1722,7 +1762,7 @@ function OperationTransactionDetail({ loggedInUser }) {
 
     if (
       (nextStatus === 'Submitted' || nextStatus === 'Draft') &&
-      !canSubmitTransaction
+      !((nextStatus === 'Draft' ? canRecallTransaction : canSubmitTransaction))
     ) {
       alert('You do not have permission to submit or recall operation transactions.')
       return

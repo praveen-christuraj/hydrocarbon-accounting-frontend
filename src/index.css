@@ -640,6 +640,87 @@ textarea:focus {
   overflow: hidden;
 }
 
+.layout-preview-wrap {
+  margin-top: 12px;
+  display: grid;
+  gap: 12px;
+}
+
+.layout-preview-section {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.layout-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.layout-preview-empty {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.layout-preview-row-label {
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+  margin: 10px 0 6px;
+}
+
+.layout-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.layout-preview-cell {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 8px 10px;
+  min-height: 58px;
+}
+
+.layout-preview-cell.span-1 {
+  grid-column: span 1;
+}
+
+.layout-preview-cell.span-2 {
+  grid-column: span 2;
+}
+
+.layout-preview-cell.span-3 {
+  grid-column: span 3;
+}
+
+.layout-preview-label {
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.layout-preview-meta {
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.drag-handle {
+  display: inline-block;
+  font-weight: 800;
+  color: #64748b;
+  cursor: grab;
+  user-select: none;
+  letter-spacing: 1px;
+}
+
 .help-modal-header {
   display: flex;
   justify-content: space-between;
@@ -2732,6 +2813,62 @@ textarea:focus {
 .table-actions button {
   padding: 6px 10px;
   font-size: 12px;
+}
+
+.pagination-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0 18px;
+  padding: 10px 12px;
+  border: 1px solid #dbeafe;
+  background: #f8fafc;
+  border-radius: 10px;
+}
+
+.pagination-summary {
+  color: #475569;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.pagination-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.pagination-actions button {
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.pagination-jump-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+
+.pagination-jump-form label {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #475569;
+}
+
+.pagination-jump-form input {
+  width: 72px;
+  padding: 6px 8px;
+}
+
+@media (max-width: 800px) {
+  .pagination-controls {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 
 .operation-layout-banner {

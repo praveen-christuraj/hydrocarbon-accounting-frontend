@@ -1,10 +1,14 @@
 import { Fragment, useEffect, useState } from 'react'
 import { getAuditLogs } from '../api/auditLogApi'
+import PaginationControls, {
+  paginateRows,
+} from '../components/common/PaginationControls'
 
 function AuditLog() {
   const [auditLogs, setAuditLogs] = useState([])
   const [loading, setLoading] = useState(false)
   const [expandedLogId, setExpandedLogId] = useState(null)
+  const [currentPage, setCurrentPage] = useState(1)
 
   const [filters, setFilters] = useState({
     moduleName: '',
@@ -23,6 +27,8 @@ function AuditLog() {
       setLoading(true)
       const logsFromApi = await getAuditLogs(activeFilters)
       setAuditLogs(logsFromApi)
+      setCurrentPage(1)
+      setExpandedLogId(null)
     } catch (error) {
       alert(error.message)
     } finally {
@@ -79,6 +85,8 @@ function AuditLog() {
 
     setExpandedLogId(logId)
   }
+
+  const visibleAuditLogs = paginateRows(auditLogs, currentPage)
 
   return (
     <div>
@@ -246,7 +254,7 @@ function AuditLog() {
               </td>
             </tr>
           ) : (
-            auditLogs.map((log) => (
+            visibleAuditLogs.map((log) => (
               <Fragment key={log.id}>
                 <tr>
                   <td>{formatDateTime(log.createdAt)}</td>
@@ -307,6 +315,12 @@ function AuditLog() {
           )}
         </tbody>
       </table>
+
+      <PaginationControls
+        currentPage={currentPage}
+        totalRows={auditLogs.length}
+        onPageChange={setCurrentPage}
+      />
 
       <div className="info-box">
         Audit Log is read-only. It records important system actions such as

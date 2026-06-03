@@ -2,6 +2,12 @@ const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
 
 const AUTH_TOKEN_KEY = 'hydrocarbonAccessToken'
+const TOKEN_STORAGE_KEYS = [
+  AUTH_TOKEN_KEY,
+  'hydrocarbon_access_token',
+  'access_token',
+  'accessToken',
+]
 
 const convertLoggedInUserFromApi = (data) => {
   const user = data.user
@@ -15,6 +21,7 @@ const convertLoggedInUserFromApi = (data) => {
     department: user.department || '',
     designation: user.designation || '',
     status: user.status,
+    security: user.security || {},
     role: user.role
       ? {
           id: user.role.id,
@@ -34,15 +41,26 @@ const convertLoggedInUserFromApi = (data) => {
 }
 
 export const getStoredAccessToken = () => {
-  return localStorage.getItem(AUTH_TOKEN_KEY)
+  for (const key of TOKEN_STORAGE_KEYS) {
+    const token = localStorage.getItem(key)
+
+    if (token && token.trim() !== '') {
+      return token.trim()
+    }
+  }
+
+  return ''
 }
 
 export const saveAccessToken = (token) => {
+  clearAccessToken()
   localStorage.setItem(AUTH_TOKEN_KEY, token)
 }
 
 export const clearAccessToken = () => {
-  localStorage.removeItem(AUTH_TOKEN_KEY)
+  TOKEN_STORAGE_KEYS.forEach((key) => {
+    localStorage.removeItem(key)
+  })
 }
 
 export const loginUser = async (username, password) => {
@@ -63,6 +81,14 @@ export const loginUser = async (username, password) => {
     throw new Error(data.detail || 'Login failed')
   }
 
+  if (data.requires_2fa) {
+    return {
+      requires2FA: true,
+      challengeId: data.challenge_id,
+      userHint: data.user_hint || null,
+    }
+  }
+
   if (!data.access_token) {
     throw new Error('Login token missing from backend response')
   }
@@ -70,6 +96,50 @@ export const loginUser = async (username, password) => {
   saveAccessToken(data.access_token)
 
   return convertLoggedInUserFromApi(data)
+}
+
+export const verifyLogin2FA = async (challengeId, code) => {
+  const response = await fetch(`${API_BASE_URL}/auth/2fa/verify`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      challenge_id: challengeId,
+      code,
+    }),
+  })
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data.detail || '2FA verification failed')
+  }
+
+  saveAccessToken(data.access_token)
+  return convertLoggedInUserFromApi(data)
+}
+
+export const requestPasswordReset = async (username, reason = '', reset2FA = false) => {
+  const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      username,
+      reason,
+      reset_2fa: Boolean(reset2FA),
+    }),
+  })
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data.detail || 'Password reset request failed')
+  }
+
+  return data
 }
 
 export const getCurrentUser = async () => {

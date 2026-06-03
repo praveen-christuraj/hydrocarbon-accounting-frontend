@@ -53,6 +53,9 @@ import VesselOperationMaster from './pages/VesselOperationMaster'
 import MovementMapping from './pages/MovementMapping'
 import FlowmeterConfigMaster from './pages/FlowmeterConfigMaster'
 import FlowmeterRecordEntry from './pages/FlowmeterRecordEntry'
+import OperationWorkflowPolicyMaster from './pages/OperationWorkflowPolicyMaster'
+import OperationTaskManager from './pages/OperationTaskManager'
+import ProfileSecurity from './pages/ProfileSecurity'
 
 import { getCurrentUser, logoutUser } from './api/authApi'
 import { getLocationOperationAvailability } from './api/locationOperationAvailabilityApi'
@@ -452,6 +455,19 @@ function AppContent({
           />
 
           <Route
+            path="/profile-security"
+            element={
+              <PermissionGuard
+                loggedInUser={loggedInUser}
+                requiredPermission="View Own Security Settings"
+                fallbackMessage="You do not have permission to view profile security settings."
+              >
+                <ProfileSecurity loggedInUser={loggedInUser} users={users} />
+              </PermissionGuard>
+            }
+          />
+
+          <Route
             path="/locations"
             element={
               <PermissionGuard
@@ -781,6 +797,25 @@ function AppContent({
           />
 
           <Route
+            path="/operation-workflow-policies"
+            element={
+              <PermissionGuard
+                loggedInUser={loggedInUser}
+                requiredPermission="View Operation Workflow Policy"
+                fallbackMessage="You do not have permission to view Operation Workflow Policies."
+              >
+                <OperationWorkflowPolicyMaster
+                  roles={roles}
+                  operationTypes={operationTypes}
+                  operationTemplates={operationTemplates}
+                  assets={assets}
+                  locations={locations}
+                />
+              </PermissionGuard>
+            }
+          />
+
+          <Route
             path="/operation-entry"
             element={
               <PermissionGuard
@@ -800,6 +835,21 @@ function AppContent({
                   loggedInUser={loggedInUser}
                   assetCalibrationTables={calibrationTables}
                   calibrationTemplates={calibrationTemplates}
+                />
+              </PermissionGuard>
+            }
+          />
+
+          <Route
+            path="/operation-tasks"
+            element={
+              <PermissionGuard
+                loggedInUser={loggedInUser}
+                requiredPermission="View My Tasks"
+                fallbackMessage="You do not have permission to view assigned tasks."
+              >
+                <OperationTaskManager
+                  reloadOperationTransactions={reloadOperationTransactions}
                 />
               </PermissionGuard>
             }

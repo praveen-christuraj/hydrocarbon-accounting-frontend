@@ -1,33 +1,10 @@
+import { clearAccessToken, getStoredAccessToken } from './authApi'
+
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
 
-const TOKEN_STORAGE_KEYS = [
-  'hydrocarbonAccessToken',
-  'hydrocarbon_access_token',
-  'access_token',
-  'accessToken',
-]
-
-const getStoredAuthToken = () => {
-  for (const key of TOKEN_STORAGE_KEYS) {
-    const token = localStorage.getItem(key)
-
-    if (token && token.trim() !== '') {
-      return token.trim()
-    }
-  }
-
-  return ''
-}
-
-const clearStoredAuthToken = () => {
-  TOKEN_STORAGE_KEYS.forEach((key) => {
-    localStorage.removeItem(key)
-  })
-}
-
 const buildHeaders = (customHeaders = {}) => {
-  const token = getStoredAuthToken()
+  const token = getStoredAccessToken()
 
   const headers = {
     ...customHeaders,
@@ -60,7 +37,7 @@ export const apiRequest = async (endpoint, options = {}) => {
 
   if (!response.ok) {
     if (response.status === 401) {
-      clearStoredAuthToken()
+      clearAccessToken()
     }
 
     throw new Error(data?.detail || 'API request failed')

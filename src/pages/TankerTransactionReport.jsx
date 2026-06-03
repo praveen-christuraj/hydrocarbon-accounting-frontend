@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { getTankerTransactionReport } from '../api/tankerTransactionReportApi'
+import PaginationControls, {
+  paginateRows,
+} from '../components/common/PaginationControls'
 
 const formatNumber = (value, decimals = 3) => {
   const numericValue = Number(value || 0)
@@ -84,6 +87,7 @@ function TankerTransactionReport({ locations = [], assets = [] }) {
   const [totals, setTotals] = useState(null)
   const [selectedRow, setSelectedRow] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
 
   const activeLocations = locations.filter((item) => item.status === 'Active')
   const activeAssets = assets.filter((item) => item.status === 'Active')
@@ -111,6 +115,7 @@ function TankerTransactionReport({ locations = [], assets = [] }) {
       setRows(report.rows)
       setTotals(report.totals)
       setSelectedRow(null)
+      setCurrentPage(1)
     } catch (error) {
       console.error(error)
       alert(error.message || 'Unable to load Tanker Transaction Report')
@@ -143,6 +148,8 @@ function TankerTransactionReport({ locations = [], assets = [] }) {
       status: '',
       search: '',
     })
+    setCurrentPage(1)
+    setSelectedRow(null)
   }
 
   const exportRows = rows.map((row) => {
@@ -222,6 +229,8 @@ function TankerTransactionReport({ locations = [], assets = [] }) {
   const handlePrint = () => {
     window.print()
   }
+
+  const visibleRows = paginateRows(rows, currentPage)
 
   return (
     <div>
@@ -428,7 +437,7 @@ function TankerTransactionReport({ locations = [], assets = [] }) {
               </td>
             </tr>
           ) : (
-            rows.map((row) => (
+            visibleRows.map((row) => (
               <tr key={row.transactionId}>
                 <td>{row.operationDate}</td>
                 <td>{row.ticketNumber || row.operationNumber}</td>
@@ -459,6 +468,12 @@ function TankerTransactionReport({ locations = [], assets = [] }) {
           )}
         </tbody>
       </table>
+
+      <PaginationControls
+        currentPage={currentPage}
+        totalRows={rows.length}
+        onPageChange={setCurrentPage}
+      />
 
       {selectedRow && (
         <div className="report-detail-panel no-print">

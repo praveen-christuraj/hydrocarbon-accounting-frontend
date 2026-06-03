@@ -13,12 +13,14 @@ const convertOperationTransactionFromApi = (item) => {
     operationTypeId: item.operation_type_id,
     operationTypeCode: item.operation_type_code || '',
     operationTypeName: item.operation_type_name || '',
+    operationTemplateId: item.operation_template_id || null,
     locationId: item.location_id,
     locationName: item.location_name || '',
     locationCode: item.location_code || '',
     primaryAssetId: item.primary_asset_id,
     primaryAssetName: item.primary_asset_name || '',
     primaryAssetCode: item.primary_asset_code || '',
+    primaryAssetTypeCode: item.primary_asset_type_code || '',
     convoyNumber: item.convoy_number || '',
     status: item.status || '',
     fieldCount: item.field_count || 0,
@@ -146,6 +148,21 @@ export const updateOperationTransactionStatus = async (
 export const getOperationTransactionStatusHistory = async (transactionId) => {
   const data = await apiGet(`/operation-transactions/${transactionId}/status-history`)
   return data.map(convertStatusHistoryFromApi)
+}
+
+export const checkOperationWorkflowPolicy = async (payload) => {
+  const response = await fetch('http://127.0.0.1:8000/operation-workflow-policies/check', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${getStoredAccessToken()}`,
+    },
+    body: JSON.stringify(payload),
+  })
+  if (!response.ok) {
+    throw new Error(await response.text())
+  }
+  return response.json()
 }
 
 export const exportOperationTransactionsCsv = async (filters = {}) => {
