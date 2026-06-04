@@ -299,6 +299,18 @@ export const navigationItems = [
         permission: 'View Admin Settings',
       },
       {
+        label: 'System Notifications',
+        path: '/system-notifications',
+        disabled: false,
+        permission: 'View System Notification',
+      },
+      {
+        label: 'Backup Recovery',
+        path: '/backup-recovery',
+        disabled: false,
+        permission: 'View Backup',
+      },
+      {
         label: 'Location Accounting Day Settings',
         path: '/location-accounting-day-settings',
         disabled: false,

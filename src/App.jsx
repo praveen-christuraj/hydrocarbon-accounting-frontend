@@ -56,6 +56,9 @@ import FlowmeterRecordEntry from './pages/FlowmeterRecordEntry'
 import OperationWorkflowPolicyMaster from './pages/OperationWorkflowPolicyMaster'
 import OperationTaskManager from './pages/OperationTaskManager'
 import ProfileSecurity from './pages/ProfileSecurity'
+import SystemNotificationMaster from './pages/SystemNotificationMaster'
+import SystemNotificationCenter from './components/SystemNotificationCenter'
+import BackupRecovery from './pages/BackupRecovery'
 
 import { getCurrentUser, logoutUser } from './api/authApi'
 import { getLocationOperationAvailability } from './api/locationOperationAvailabilityApi'
@@ -342,6 +345,7 @@ function AppContent({
       </header>
 
       <NavigationBar loggedInUser={loggedInUser} />
+      <SystemNotificationCenter loggedInUser={loggedInUser} />
 
       <main className="main-content">
         <PageHelp />
@@ -699,6 +703,36 @@ function AppContent({
                 fallbackMessage="You do not have permission to view audit logs."
               >
                 <AuditLog />
+              </PermissionGuard>
+            }
+          />
+
+          <Route
+            path="/system-notifications"
+            element={
+              <PermissionGuard
+                loggedInUser={loggedInUser}
+                requiredPermission="View System Notification"
+                fallbackMessage="You do not have permission to view system notifications."
+              >
+                <SystemNotificationMaster
+                  roles={roles}
+                  users={users}
+                  locations={locations}
+                />
+              </PermissionGuard>
+            }
+          />
+
+          <Route
+            path="/backup-recovery"
+            element={
+              <PermissionGuard
+                loggedInUser={loggedInUser}
+                requiredPermission="View Backup"
+                fallbackMessage="You do not have permission to view backup recovery."
+              >
+                <BackupRecovery loggedInUser={loggedInUser} />
               </PermissionGuard>
             }
           />

@@ -312,7 +312,7 @@ textarea:focus {
   border-bottom: 1px solid #e5e7eb;
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
   position: relative;
-  z-index: 10;
+  z-index: 1200;
 }
 
 .nav-link,
@@ -353,7 +353,7 @@ textarea:focus {
 .nav-dropdown-menu {
   display: none;
   position: absolute;
-  top: calc(100% + 6px);
+  top: 100%;
   left: 0;
   min-width: 260px;
   background: white;
@@ -4528,6 +4528,336 @@ textarea:focus {
   th, td { border: 1px solid #000 !important; padding: 3px 4px !important; font-size: 10px !important; }
 }
 .print-only { display: none; }
+
+/* =========================
+   Backup Recovery
+   ========================= */
+.backup-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(180px, 1fr));
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.backup-kpi-grid .info-box {
+  margin: 0;
+}
+
+.backup-kpi-grid p {
+  margin: 8px 0 4px;
+  font-size: 22px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.backup-form {
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+}
+
+@media (max-width: 1100px) {
+  .backup-kpi-grid {
+    grid-template-columns: repeat(2, minmax(180px, 1fr));
+  }
+}
+
+@media (max-width: 800px) {
+  .backup-kpi-grid,
+  .backup-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* =========================
+   System Notifications
+   ========================= */
+.system-notification-shell {
+  position: relative;
+  z-index: 40;
+}
+
+.notification-topline {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 10px 40px 0;
+}
+
+.notification-bell-button,
+.notification-task-button {
+  background: #0f172a;
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.18);
+}
+
+.notification-task-button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 9px 14px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.notification-task-button:hover {
+  background: #1e3a8a;
+}
+
+.notification-bell-button span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  margin-left: 8px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 12px;
+}
+
+.system-notification-banner {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 12px 40px 0;
+  padding: 14px 16px;
+  border: 1px solid #bfdbfe;
+  border-left: 5px solid #2563eb;
+  border-radius: 12px;
+  background: #eff6ff;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
+}
+
+.system-notification-banner p,
+.notification-inbox-item p,
+.notification-popup-card p {
+  margin: 6px 0;
+  line-height: 1.45;
+}
+
+.system-notification-banner.warning,
+.system-notification-banner.maintenance {
+  border-color: #fde68a;
+  border-left-color: #d97706;
+  background: #fffbeb;
+}
+
+.system-notification-banner.critical {
+  border-color: #fecaca;
+  border-left-color: #dc2626;
+  background: #fef2f2;
+}
+
+.system-notification-banner.success {
+  border-color: #bbf7d0;
+  border-left-color: #16a34a;
+  background: #f0fdf4;
+}
+
+.system-notification-banner.circular {
+  border-color: #c7d2fe;
+  border-left-color: #4f46e5;
+  background: #eef2ff;
+}
+
+.system-notification-banner.high,
+.system-notification-banner.critical {
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.14);
+}
+
+.notification-action-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 220px;
+}
+
+.notification-action-row input {
+  min-width: 220px;
+}
+
+.notification-action-row button {
+  background: #2563eb;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.notification-popup-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.48);
+}
+
+.notification-popup-card {
+  width: min(620px, 100%);
+  padding: 24px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.28);
+}
+
+.notification-inbox-panel {
+  position: absolute;
+  right: 40px;
+  top: 56px;
+  width: min(480px, calc(100vw - 32px));
+  max-height: 70vh;
+  overflow: auto;
+  padding: 16px;
+  border: 1px solid #dbe3ef;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.2);
+}
+
+.notification-inbox-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.notification-inbox-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.notification-inbox-header-actions a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #0f172a;
+  color: #fff;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.notification-inbox-header h3 {
+  margin: 0;
+}
+
+.notification-inbox-header button {
+  background: #64748b;
+  color: #fff;
+}
+
+.notification-inbox-item {
+  display: grid;
+  gap: 10px;
+  padding: 12px 0;
+  border-top: 1px solid #e5e7eb;
+}
+
+.notification-admin-form {
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+}
+
+.notification-admin-form textarea {
+  min-height: 96px;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font: inherit;
+  resize: vertical;
+}
+
+.notification-admin-form textarea:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16);
+  outline: none;
+}
+
+.full-width-field {
+  grid-column: 1 / -1;
+}
+
+.notification-target-box {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  gap: 8px 14px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.notification-target-box > label:first-child,
+.notification-target-box small {
+  grid-column: 1 / -1;
+}
+
+.checkbox-label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-weight: 600;
+}
+
+.checkbox-label input {
+  width: 16px;
+  height: 16px;
+}
+
+.table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.table-actions button {
+  margin: 0;
+}
+
+.compact-section-title {
+  margin-top: 0;
+}
+
+@media (max-width: 900px) {
+  .notification-topline {
+    padding: 10px 16px 0;
+  }
+
+  .system-notification-banner {
+    flex-direction: column;
+    margin: 12px 16px 0;
+  }
+
+  .notification-inbox-panel {
+    right: 16px;
+    top: 54px;
+  }
+
+  .notification-action-row {
+    align-items: stretch;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .notification-action-row input {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .notification-admin-form,
+  .notification-target-box {
+    grid-template-columns: 1fr;
+  }
+}
 /* =========================
    MTR Print Layout (A4)
    ========================= */
