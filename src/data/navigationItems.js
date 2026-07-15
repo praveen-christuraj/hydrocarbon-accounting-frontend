@@ -5,12 +5,12 @@ export const navigationItems = [
     type: 'link',
     permission: null,
   },
-  {
-    label: 'Dashboard',
-    path: '/dashboard',
-    type: 'link',
-    permission: 'View Dashboard',
-  },
+  // {
+  //   label: 'Dashboard',
+  //   path: '/dashboard',
+  //   type: 'link',
+  //   permission: 'View Dashboard',
+  // },
   {
     label: 'User Management',
     type: 'dropdown',
@@ -281,12 +281,12 @@ export const navigationItems = [
         path: '/company-report-profiles',
         disabled: false,
       },
-      {
-        label: 'Dashboard Builder',
-        path: '/dashboard-builder',
-        type: 'link',
-        permission: 'Manage Dashboard',
-      },
+      // {
+      //   label: 'Dashboard Builder',
+      //   path: '/dashboard-builder',
+      //   type: 'link',
+      //   permission: 'Manage Dashboard',
+      // },
       {
         label: 'Barge Seal Master',
         path: '/barge-seal-master',

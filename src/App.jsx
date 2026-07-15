@@ -47,8 +47,8 @@ import PrimeMoverTankerLinkMaster from './pages/PrimeMoverTankerLinkMaster'
 import TankerTracking from './pages/TankerTracking'
 import ShuttleTracking from './pages/ShuttleTracking'
 import FSOTracking from './pages/FSOTracking'
-import Dashboard from './pages/Dashboard'
-import DashboardBuilder from './pages/DashboardBuilder'
+// import Dashboard from './pages/Dashboard'
+// import DashboardBuilder from './pages/DashboardBuilder'
 import VesselOperationMaster from './pages/VesselOperationMaster'
 import MovementMapping from './pages/MovementMapping'
 import FlowmeterConfigMaster from './pages/FlowmeterConfigMaster'
@@ -959,7 +959,7 @@ function AppContent({
               </PermissionGuard>
             }
           />
-          <Route
+          {/* <Route
             path="/dashboard"
             element={
               <PermissionGuard
@@ -987,7 +987,7 @@ function AppContent({
                 />
               </PermissionGuard>
             }
-          />
+          /> */}
           <Route
             path="/location-operation-availability"
             element={
