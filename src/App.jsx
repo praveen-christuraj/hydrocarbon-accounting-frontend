@@ -79,7 +79,6 @@ import { getOperationTypes } from './api/operationTypeApi'
 import { getOperationTemplates } from './api/operationTemplateApi'
 import { getOperationEntries } from './api/operationEntryApi'
 import { getOperationTransactions } from './api/operationTransactionApi'
-import { getUserRoles } from './api/userRoleApi'
 
 function PageHelp() {
   const location = useLocation()
@@ -1213,7 +1212,7 @@ function App() {
 
   const reloadUserRoleAssignments = async () => {
     try {
-      const userRoleAssignmentsFromApi = await getUserRoles()
+      const userRoleAssignmentsFromApi = await getUserRoleAssignments()
       setUserRoleAssignments(userRoleAssignmentsFromApi)
     } catch (error) {
       console.error(error)

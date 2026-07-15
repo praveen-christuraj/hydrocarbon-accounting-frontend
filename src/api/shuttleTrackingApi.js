@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from './apiClient'
+import { apiGet, apiPost, apiDownload } from './apiClient'
 
 const buildQueryString = (filters = {}) => {
   const params = new URLSearchParams()
@@ -107,39 +107,9 @@ export const reopenShuttleVoyage = async ({
   })
 }
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
-const TOKEN_STORAGE_KEYS = [
-  'hydrocarbonAccessToken',
-  'hydrocarbon_access_token',
-  'access_token',
-  'accessToken',
-]
-
-const getStoredAuthToken = () => {
-  for (const key of TOKEN_STORAGE_KEYS) {
-    const token = localStorage.getItem(key)
-    if (token && token.trim() !== '') return token.trim()
-  }
-  return ''
-}
-
 export const downloadShuttleVoyageXlsx = async ({ group_key }) => {
-  const token = getStoredAuthToken()
-  const url = `${API_BASE_URL}/shuttle-tracking/export/xlsx?group_key=${encodeURIComponent(group_key)}`
-  const res = await fetch(url, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  })
-  if (!res.ok) {
-    const text = await res.text()
-    throw new Error(text || 'Download failed')
-  }
-  const blob = await res.blob()
-  const a = document.createElement('a')
-  a.href = URL.createObjectURL(blob)
-  a.download = 'shuttle_mtr.xlsx'
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(a.href)
+  await apiDownload(
+    `/shuttle-tracking/export/xlsx?group_key=${encodeURIComponent(group_key)}`,
+    'shuttle_mtr.xlsx'
+  )
 }

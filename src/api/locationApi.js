@@ -30,7 +30,7 @@ const convertLocationToApi = (location) => {
 
 export const getLocations = async () => {
   const data = await apiGet('/locations')
-  return data.map(convertLocationFromApi)
+  return (data.items || data).map(convertLocationFromApi)
 }
 
 export const createLocation = async (location) => {

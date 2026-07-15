@@ -2,12 +2,15 @@
 node_modules/
 dist/
 build/
+.cache/
+.parcel-cache/
 
 # Environment
 .env
 .env.*
 .env.local
 .env.development.local
+.env.test.local
 .env.production.local
 
 # Logs
@@ -15,11 +18,29 @@ build/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+
+# Testing / coverage
+coverage/
+.nyc_output/
+
+# Linting
+.eslintcache
+.stylelintcache
 
 # IDE
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
 
 # OS
 .DS_Store
 Thumbs.db
+Desktop.ini
+
+# Misc
+*.tsbuildinfo
+.vercel/
+.netlify/

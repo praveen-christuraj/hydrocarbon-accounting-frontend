@@ -1,8 +1,4 @@
-import { getStoredAccessToken } from './authApi'
-import { apiDelete, apiGet, apiPost, apiPut } from './apiClient'
-
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
+import { apiDelete, apiGet, apiPost, apiPut, apiDownload } from './apiClient'
 
 const fromSettingsApi = (row) => ({
   id: row.id,
@@ -139,38 +135,7 @@ export const cleanupBackups = async () => {
 }
 
 export const downloadBackup = async (backupId, fallbackFileName = 'backup.dump') => {
-  const token = getStoredAccessToken()
-  const response = await fetch(`${API_BASE_URL}/backups/${backupId}/download`, {
-    headers: token
-      ? {
-          Authorization: `Bearer ${token}`,
-        }
-      : {},
-  })
-
-  if (!response.ok) {
-    let message = 'Backup download failed'
-    try {
-      const data = await response.json()
-      message = data?.detail || message
-    } catch {
-      // Keep generic message for non-JSON errors.
-    }
-    throw new Error(message)
-  }
-
-  const blob = await response.blob()
-  const disposition = response.headers.get('content-disposition') || ''
-  const match = disposition.match(/filename=\"?([^\";]+)\"?/i)
-  const fileName = match?.[1] || fallbackFileName
-  const url = window.URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = fileName
-  document.body.appendChild(link)
-  link.click()
-  link.remove()
-  window.URL.revokeObjectURL(url)
+  await apiDownload(`/backups/${backupId}/download`, fallbackFileName)
 }
 
 export const getBackupRestoreRequests = async (filters = {}) => {

@@ -1,6 +1,6 @@
 import { clearAccessToken, getStoredAccessToken } from './authApi'
 
-const API_BASE_URL =
+export const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
 
 const buildHeaders = (customHeaders = {}) => {
@@ -84,4 +84,35 @@ export const apiDelete = async (endpoint) => {
   return apiRequest(endpoint, {
     method: 'DELETE',
   })
+}
+
+export const apiDownload = async (endpoint, filename) => {
+  const token = getStoredAccessToken()
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+
+  if (!response.ok) {
+    let message = 'Download failed'
+    try {
+      const data = await response.json()
+      message = data?.detail || message
+    } catch {
+      // Keep generic message for non-JSON errors.
+    }
+    throw new Error(message)
+  }
+
+  const blob = await response.blob()
+  const disposition = response.headers.get('content-disposition') || ''
+  const match = disposition.match(/filename="?([^";]+)"?/i)
+  const fileName = match?.[1] || filename
+  const url = window.URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = fileName
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  window.URL.revokeObjectURL(url)
 }

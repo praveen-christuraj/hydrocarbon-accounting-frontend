@@ -6,8 +6,9 @@ import {
   getOperationTransactionDetail,
   updateOperationTransactionStatus,
   getOperationTransactionStatusHistory,
-  checkOperationWorkflowPolicy,
 } from '../api/operationTransactionApi'
+
+import { checkOperationWorkflowPolicy } from '../api/operationWorkflowPolicyApi'
 
 import { getCompanyReportProfiles } from '../api/companyReportProfileApi'
 import TankerPayloadPreview from '../components/operationLayouts/TankerPayloadPreview'

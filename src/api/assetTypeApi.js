@@ -23,7 +23,7 @@ const convertAssetTypeToApi = (assetType) => {
 
 export const getAssetTypes = async () => {
   const data = await apiGet('/asset-types')
-  return data.map(convertAssetTypeFromApi)
+  return (data.items || data).map(convertAssetTypeFromApi)
 }
 
 export const createAssetType = async (assetType) => {

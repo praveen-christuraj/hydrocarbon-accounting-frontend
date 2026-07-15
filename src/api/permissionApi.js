@@ -23,7 +23,7 @@ const convertPermissionToApi = (permission) => {
 
 export const getPermissions = async () => {
   const data = await apiGet('/permissions')
-  return data.map(convertPermissionFromApi)
+  return (data.items || data).map(convertPermissionFromApi)
 }
 
 export const createPermission = async (permission) => {

@@ -21,7 +21,7 @@ const convertRoleToApi = (role) => {
 
 export const getRoles = async () => {
   const data = await apiGet('/roles')
-  return data.map(convertRoleFromApi)
+  return (data.items || data).map(convertRoleFromApi)
 }
 
 export const createRole = async (role) => {

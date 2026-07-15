@@ -43,7 +43,7 @@ const convertAssetToApi = (asset) => {
 
 export const getAssets = async () => {
   const data = await apiGet('/assets')
-  return data.map(convertAssetFromApi)
+  return (data.items || data).map(convertAssetFromApi)
 }
 
 export const createAsset = async (asset) => {

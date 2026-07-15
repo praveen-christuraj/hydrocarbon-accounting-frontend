@@ -31,7 +31,7 @@ const convertUserToApi = (user) => {
 
 export const getUsers = async () => {
   const data = await apiGet('/users')
-  return data.map(convertUserFromApi)
+  return (data.items || data).map(convertUserFromApi)
 }
 
 export const createUser = async (user) => {

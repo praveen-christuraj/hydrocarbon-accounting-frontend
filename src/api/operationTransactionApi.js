@@ -1,5 +1,4 @@
 import { apiGet, apiPatch, apiPost } from './apiClient'
-import { getStoredAccessToken } from './authApi'
 
 const convertOperationTransactionFromApi = (item) => {
   return {
@@ -165,21 +164,6 @@ export const createOperationTransactionCorrectionRequest = async (
   })
 }
 
-export const checkOperationWorkflowPolicy = async (payload) => {
-  const response = await fetch('http://127.0.0.1:8000/operation-workflow-policies/check', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${getStoredAccessToken()}`,
-    },
-    body: JSON.stringify(payload),
-  })
-  if (!response.ok) {
-    throw new Error(await response.text())
-  }
-  return response.json()
-}
-
 export const exportOperationTransactionsCsv = async (filters = {}) => {
   const params = new URLSearchParams()
 
@@ -216,36 +200,6 @@ export const exportOperationTransactionsCsv = async (filters = {}) => {
     ? `/operation-transactions/export/csv?${queryString}`
     : '/operation-transactions/export/csv'
 
-  const token = getStoredAccessToken()
-
-  if (!token) {
-    throw new Error('Login token missing. Please logout and login again.')
-  }
-
-  const response = await fetch(`http://127.0.0.1:8000${path}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  })
-
-  if (!response.ok) {
-    const errorText = await response.text()
-    throw new Error(errorText || 'Failed to export operation transactions')
-  }
-
-  const blob = await response.blob()
-
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-
-  link.href = url
-  link.download = `operation-transaction-register-${new Date()
-    .toISOString()
-    .slice(0, 10)}.csv`
-
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-
-  URL.revokeObjectURL(url)
+  const { apiDownload } = await import('./apiClient')
+  await apiDownload(path, `operation-transaction-register-${new Date().toISOString().slice(0, 10)}.csv`)
 }
