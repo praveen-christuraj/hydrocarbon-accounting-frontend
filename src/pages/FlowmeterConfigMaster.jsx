@@ -20,13 +20,28 @@ const emptyForm = {
   status: 'Active',
 }
 
-function FlowmeterConfigMaster({ locations = [], assets = [], assetAssignments = [] }) {
+function FlowmeterConfigMaster({ locations = [], assets = [], assetAssignments = [], loggedInUser }) {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(false)
   const [historyRows, setHistoryRows] = useState([])
   const [historyLoading, setHistoryLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState(emptyForm)
+  const [successMsg, setSuccessMsg] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
+  const [validationErrors, setValidationErrors] = useState({})
+  const [confirmDeleteItem, setConfirmDeleteItem] = useState(null)
+
+  const isAdminBootstrap =
+    String(loggedInUser?.username || '').toLowerCase() === 'admin'
+  const hasPermission = (permissionName) => {
+    if (isAdminBootstrap) return true
+    if (!loggedInUser || !Array.isArray(loggedInUser.permissions)) return false
+    return loggedInUser.permissions.some(
+      (p) => p.permissionName === permissionName
+    )
+  }
+  const canManageFlowmeterConfig = hasPermission('Manage Flowmeter Config')
 
   const activeAssets = useMemo(() => {
     return (assets || []).filter((a) => String(a.status || '').toLowerCase() === 'active')
@@ -71,7 +86,7 @@ function FlowmeterConfigMaster({ locations = [], assets = [], assetAssignments =
       setRows(data)
       setHistoryRows(history)
     } catch (error) {
-      alert(error?.message || 'Failed to load flowmeter configs')
+      setErrorMsg(error?.message || 'Failed to load flowmeter configs')
     } finally {
       setLoading(false)
       setHistoryLoading(false)
@@ -83,12 +98,25 @@ function FlowmeterConfigMaster({ locations = [], assets = [], assetAssignments =
   }, [])
 
   const handleSave = async () => {
-    if (!form.assetCode) return alert('Stream asset is required')
-    if (!String(form.streamName || '').trim()) return alert('Stream Name is required')
-    if (!String(form.meterLabel || '').trim()) return alert('Meter Label is required')
-    if (Number(form.meterFactor || 0) <= 0) return alert('Meter Factor must be greater than 0')
+    if (!canManageFlowmeterConfig) {
+      setErrorMsg('You do not have permission to manage flowmeter configurations.')
+      return
+    }
+
+    setSuccessMsg('')
+    setErrorMsg('')
+    setValidationErrors({})
+
+    const errors = {}
+    if (!form.assetCode) errors.assetCode = 'Stream asset is required'
+    if (!String(form.streamName || '').trim()) errors.streamName = 'Stream Name is required'
+    if (!String(form.meterLabel || '').trim()) errors.meterLabel = 'Meter Label is required'
+    if (Number(form.meterFactor || 0) <= 0) errors.meterFactor = 'Meter Factor must be greater than 0'
     const assignedLocationCode = assignedLocationByAssetCode[form.assetCode]
-    if (!assignedLocationCode) return alert('Selected stream asset must have an active location assignment')
+    if (!assignedLocationCode && form.assetCode) errors.locationCode = 'Selected stream asset must have an active location assignment'
+
+    setValidationErrors(errors)
+    if (Object.keys(errors).length > 0) return
 
     try {
       setSaving(true)
@@ -98,21 +126,26 @@ function FlowmeterConfigMaster({ locations = [], assets = [], assetAssignments =
       }
       if (form.id) {
         await updateFlowmeterConfig(form.id, payload)
-        alert('Flowmeter config updated')
+        setSuccessMsg('Flowmeter config updated')
       } else {
         await createFlowmeterConfig(payload)
-        alert('Flowmeter config created')
+        setSuccessMsg('Flowmeter config created')
       }
       setForm(emptyForm)
       await reload()
     } catch (error) {
-      alert(error?.message || 'Save failed')
+      setErrorMsg(error?.message || 'Save failed')
     } finally {
       setSaving(false)
     }
   }
 
   const handleEdit = (row) => {
+    if (!canManageFlowmeterConfig) {
+      setErrorMsg('You do not have permission to manage flowmeter configurations.')
+      return
+    }
+
     setForm({
       id: row.id,
       locationCode: row.locationCode,
@@ -127,13 +160,24 @@ function FlowmeterConfigMaster({ locations = [], assets = [], assetAssignments =
     })
   }
 
-  const handleDelete = async (row) => {
-    if (!window.confirm(`Delete ${row.assetCode} / ${row.streamName} / ${row.meterLabel}?`)) return
+  const handleDelete = async () => {
+    if (!canManageFlowmeterConfig) {
+      setErrorMsg('You do not have permission to manage flowmeter configurations.')
+      return
+    }
+
+    setSuccessMsg('')
+    setErrorMsg('')
     try {
-      await deleteFlowmeterConfig(row.id)
+      setSaving(true)
+      await deleteFlowmeterConfig(confirmDeleteItem.id)
+      setConfirmDeleteItem(null)
       await reload()
+      setSuccessMsg('Flowmeter config deleted')
     } catch (error) {
-      alert(error?.message || 'Delete failed')
+      setErrorMsg(error?.message || 'Delete failed')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -146,25 +190,63 @@ function FlowmeterConfigMaster({ locations = [], assets = [], assetAssignments =
         </div>
       </div>
 
+      {successMsg && (
+        <div className="success-box">{successMsg}</div>
+      )}
+
+      {errorMsg && (
+        <div className="error-box">{errorMsg}</div>
+      )}
+
+      {confirmDeleteItem && (
+        <div className="confirm-overlay">
+          <div className="confirm-box">
+            <p>Delete <strong>{confirmDeleteItem.assetCode}</strong> / <strong>{confirmDeleteItem.streamName}</strong> / <strong>{confirmDeleteItem.meterLabel}</strong>?</p>
+            <div className="confirm-actions">
+              <button onClick={handleDelete} disabled={saving}>
+                {saving ? 'Deleting...' : 'Yes, Delete'}
+              </button>
+              <button onClick={() => setConfirmDeleteItem(null)} disabled={saving}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!canManageFlowmeterConfig && (
+        <div className="info-box">
+          You are in view-only mode. Contact an administrator to configure
+          flowmeters.
+        </div>
+      )}
+
+      {canManageFlowmeterConfig && (
+      <>
       <div className="form-grid">
         <div>
           <label>Stream Asset *</label>
           <select
             value={form.assetCode}
-            onChange={(e) =>
+            onChange={(e) => {
               setForm((p) => ({
                 ...p,
                 assetCode: e.target.value,
                 locationCode: assignedLocationByAssetCode[e.target.value] || '',
                 streamName: e.target.value || 'Default',
               }))
-            }
+              setValidationErrors({ ...validationErrors, assetCode: '' })
+            }}
+            className={validationErrors.assetCode ? 'input-error' : ''}
           >
             <option value="">Select Stream Asset</option>
             {(streamAssets.length > 0 ? streamAssets : activeAssets).map((a) => (
               <option key={a.assetCode} value={a.assetCode}>{a.assetName} ({a.assetCode})</option>
             ))}
           </select>
+          {validationErrors.assetCode && (
+            <span className="field-error">{validationErrors.assetCode}</span>
+          )}
         </div>
 
         <div>
@@ -182,17 +264,26 @@ function FlowmeterConfigMaster({ locations = [], assets = [], assetAssignments =
 
         <div>
           <label>Stream Code</label>
-          <input value={form.streamName} disabled />
+          <input value={form.streamName} disabled className={validationErrors.streamName ? 'input-error' : ''} />
+          {validationErrors.streamName && (
+            <span className="field-error">{validationErrors.streamName}</span>
+          )}
         </div>
 
         <div>
           <label>Meter Label *</label>
-          <input value={form.meterLabel} onChange={(e) => setForm((p) => ({ ...p, meterLabel: e.target.value }))} placeholder="Example: Meter 1" />
+          <input value={form.meterLabel} onChange={(e) => { setForm((p) => ({ ...p, meterLabel: e.target.value })); setValidationErrors({ ...validationErrors, meterLabel: '' }) }} placeholder="Example: Meter 1" className={validationErrors.meterLabel ? 'input-error' : ''} />
+          {validationErrors.meterLabel && (
+            <span className="field-error">{validationErrors.meterLabel}</span>
+          )}
         </div>
 
         <div>
           <label>Meter Factor *</label>
-          <input type="number" min="0.0001" step="0.0001" value={form.meterFactor} onChange={(e) => setForm((p) => ({ ...p, meterFactor: e.target.value }))} />
+          <input type="number" min="0.0001" step="0.0001" value={form.meterFactor} onChange={(e) => { setForm((p) => ({ ...p, meterFactor: e.target.value })); setValidationErrors({ ...validationErrors, meterFactor: '' }) }} className={validationErrors.meterFactor ? 'input-error' : ''} />
+          {validationErrors.meterFactor && (
+            <span className="field-error">{validationErrors.meterFactor}</span>
+          )}
         </div>
 
         <div>
@@ -228,6 +319,8 @@ function FlowmeterConfigMaster({ locations = [], assets = [], assetAssignments =
         </button>
         <button type="button" onClick={() => setForm(emptyForm)} disabled={saving}>Clear</button>
       </div>
+      </>
+      )}
 
       <div className="section-title">
         <h3>Saved Configs</h3>
@@ -262,8 +355,12 @@ function FlowmeterConfigMaster({ locations = [], assets = [], assetAssignments =
                 <td>{row.calibrationDate || '-'}</td>
                 <td>{row.status}</td>
                 <td className="action-buttons">
-                  <button type="button" onClick={() => handleEdit(row)}>Edit</button>
-                  <button type="button" className="danger-button" onClick={() => handleDelete(row)}>Delete</button>
+                  {canManageFlowmeterConfig && (
+                    <button type="button" onClick={() => handleEdit(row)}>Edit</button>
+                  )}
+                  {canManageFlowmeterConfig && (
+                    <button type="button" className="danger-button" onClick={() => { setSuccessMsg(''); setErrorMsg(''); setConfirmDeleteItem(row) }}>Delete</button>
+                  )}
                 </td>
               </tr>
             ))}

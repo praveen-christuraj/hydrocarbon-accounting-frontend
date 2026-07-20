@@ -30,6 +30,9 @@ const downloadCsv = (filename, headers, rows) => {
 function FSOTracking({ locations = [], assets = [] }) {
   const [tab, setTab] = useState('OTR') // OTR | MB | OUTTURN
   const [loading, setLoading] = useState(false)
+  const [successMsg, setSuccessMsg] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
+  const [validationErrors, setValidationErrors] = useState({})
 
   const [filters, setFilters] = useState({
     locationCode: '',
@@ -50,10 +53,13 @@ function FSOTracking({ locations = [], assets = [] }) {
   }, [assets])
 
   const requireBaseFilters = () => {
-    if (!filters.locationCode || !filters.fsoAssetCode || !filters.dateFrom || !filters.dateTo) {
-      alert('Location, FSO Asset, Date From, Date To are required')
-      return false
-    }
+    const errors = {}
+    if (!filters.locationCode) errors.locationCode = 'Location is required'
+    if (!filters.fsoAssetCode) errors.fsoAssetCode = 'FSO Asset is required'
+    if (!filters.dateFrom) errors.dateFrom = 'Date From is required'
+    if (!filters.dateTo) errors.dateTo = 'Date To is required'
+    setValidationErrors(errors)
+    if (Object.keys(errors).length) return false
     return true
   }
 
@@ -70,7 +76,7 @@ function FSOTracking({ locations = [], assets = [] }) {
       })
       setOtr(data)
     } catch (e) {
-      alert(e.message || 'Unable to load FSO OTR report')
+      setErrorMsg(e.message || 'Unable to load FSO OTR report')
     } finally {
       setLoading(false)
     }
@@ -88,7 +94,7 @@ function FSOTracking({ locations = [], assets = [] }) {
       })
       setMb(data)
     } catch (e) {
-      alert(e.message || 'Unable to load FSO Material Balance report')
+      setErrorMsg(e.message || 'Unable to load FSO Material Balance report')
     } finally {
       setLoading(false)
     }
@@ -106,14 +112,17 @@ function FSOTracking({ locations = [], assets = [] }) {
       })
       setOutturn(data)
     } catch (e) {
-      alert(e.message || 'Unable to load FSO Outturn report')
+      setErrorMsg(e.message || 'Unable to load FSO Outturn report')
     } finally {
       setLoading(false)
     }
   }
 
   const exportOTRcsv = () => {
-    if (!otr?.rows?.length) return alert('No rows to export')
+    if (!otr?.rows?.length) {
+      setErrorMsg('No rows to export')
+      return
+    }
     const headers = [
       'ticket_number','accounting_date','operation_date','event_time',
       'operation_label','operation_sign','shuttle_number',
@@ -126,7 +135,10 @@ function FSOTracking({ locations = [], assets = [] }) {
   }
 
   const exportMBcsv = () => {
-    if (!mb?.rows?.length) return alert('No rows to export')
+    if (!mb?.rows?.length) {
+      setErrorMsg('No rows to export')
+      return
+    }
     const headers = [
       'accounting_date','opening_stock_bbl','receipt_bbl','export_bbl',
       'book_closing_bbl','physical_closing_bbl','physical_closing_water_bbl','loss_gain_bbl',
@@ -135,7 +147,10 @@ function FSOTracking({ locations = [], assets = [] }) {
   }
 
   const exportOutturnCsv = () => {
-    if (!outturn?.rows?.length) return alert('No rows to export')
+    if (!outturn?.rows?.length) {
+      setErrorMsg('No rows to export')
+      return
+    }
     const headers = [
       'accounting_date','shuttle_number',
       'shuttle_discharge_bbl','fso_receipt_bbl','variance_bbl','variance_pct',
@@ -157,7 +172,7 @@ function FSOTracking({ locations = [], assets = [] }) {
         shuttle_number: filters.shuttleNumber || '',
       })
     } catch (e) {
-      alert(e.message || 'Unable to download excel')
+      setErrorMsg(e.message || 'Unable to download excel')
     } finally {
       setLoading(false)
     }
@@ -174,7 +189,7 @@ function FSOTracking({ locations = [], assets = [] }) {
         date_to: filters.dateTo,
       })
     } catch (e) {
-      alert(e.message || 'Unable to download excel')
+      setErrorMsg(e.message || 'Unable to download excel')
     } finally {
       setLoading(false)
     }
@@ -191,7 +206,7 @@ function FSOTracking({ locations = [], assets = [] }) {
         date_to: filters.dateTo,
       })
     } catch (e) {
-      alert(e.message || 'Unable to download excel')
+      setErrorMsg(e.message || 'Unable to download excel')
     } finally {
       setLoading(false)
     }
@@ -199,6 +214,16 @@ function FSOTracking({ locations = [], assets = [] }) {
 
   return (
     <>
+      {successMsg && (
+        <div className="success-box" onClick={() => setSuccessMsg('')}>
+          {successMsg}
+        </div>
+      )}
+      {errorMsg && (
+        <div className="error-box" onClick={() => setErrorMsg('')}>
+          {errorMsg}
+        </div>
+      )}
       <div className="print-only mtr-page">
         <div className="mtr-header">
           <h1>FSO MTR REPORT</h1>

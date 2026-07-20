@@ -47,12 +47,12 @@ export const getFlowmeterConfigs = async ({ locationCode = '', assetCode = '', s
   if (String(locationCode || '').trim()) params.set('location_code', String(locationCode).trim())
   if (String(assetCode || '').trim()) params.set('asset_code', String(assetCode).trim())
   if (String(streamName || '').trim()) params.set('stream_name', String(streamName).trim())
-  const data = await apiGet(`/flowmeter-configs${params.toString() ? `?${params.toString()}` : ''}`)
+  const data = await apiGet(`/flowmeter/configs${params.toString() ? `?${params.toString()}` : ''}`)
   return (data || []).map(convertConfigFromApi)
 }
 
 export const createFlowmeterConfig = async (payload) => {
-  const data = await apiPost('/flowmeter-configs', {
+  const data = await apiPost('/flowmeter/configs', {
     location_code: payload.locationCode,
     asset_code: payload.assetCode,
     stream_name: payload.streamName || 'Default',
@@ -68,7 +68,7 @@ export const createFlowmeterConfig = async (payload) => {
 }
 
 export const updateFlowmeterConfig = async (id, payload) => {
-  const data = await apiPut(`/flowmeter-configs/${id}`, {
+  const data = await apiPut(`/flowmeter/configs/${id}`, {
     location_code: payload.locationCode,
     asset_code: payload.assetCode,
     stream_name: payload.streamName || 'Default',
@@ -83,7 +83,7 @@ export const updateFlowmeterConfig = async (id, payload) => {
   return convertConfigFromApi(data)
 }
 
-export const deleteFlowmeterConfig = async (id) => apiDelete(`/flowmeter-configs/${id}`)
+export const deleteFlowmeterConfig = async (id) => apiDelete(`/flowmeter/configs/${id}`)
 
 export const getFlowmeterRecords = async (filters = {}) => {
   const params = new URLSearchParams()
@@ -93,12 +93,12 @@ export const getFlowmeterRecords = async (filters = {}) => {
   if (String(filters.meterLabel || '').trim()) params.set('meter_label', String(filters.meterLabel).trim())
   if (String(filters.dateFrom || '').trim()) params.set('date_from', String(filters.dateFrom).trim())
   if (String(filters.dateTo || '').trim()) params.set('date_to', String(filters.dateTo).trim())
-  const data = await apiGet(`/flowmeter-records${params.toString() ? `?${params.toString()}` : ''}`)
+  const data = await apiGet(`/flowmeter/records${params.toString() ? `?${params.toString()}` : ''}`)
   return (data || []).map(convertRecordFromApi)
 }
 
 export const createFlowmeterRecord = async (payload) => {
-  const data = await apiPost('/flowmeter-records', {
+  const data = await apiPost('/flowmeter/records', {
     location_code: payload.locationCode,
     asset_code: payload.assetCode,
     meter_label: payload.meterLabel,
@@ -118,7 +118,7 @@ export const getFlowmeterConfigHistory = async ({ assetCode = '', streamName = '
   if (String(assetCode || '').trim()) params.set('asset_code', String(assetCode).trim())
   if (String(streamName || '').trim()) params.set('stream_name', String(streamName).trim())
   if (String(meterLabel || '').trim()) params.set('meter_label', String(meterLabel).trim())
-  const data = await apiGet(`/flowmeter-configs/history${params.toString() ? `?${params.toString()}` : ''}`)
+  const data = await apiGet(`/flowmeter/configs/history${params.toString() ? `?${params.toString()}` : ''}`)
   return (data || []).map((row) => ({
     id: row.id,
     configId: row.config_id,

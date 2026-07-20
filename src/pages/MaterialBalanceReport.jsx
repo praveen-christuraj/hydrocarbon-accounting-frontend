@@ -20,6 +20,8 @@ function MaterialBalanceReport({ locations, assets }) {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
+  const [successMsg, setSuccessMsg] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
 
   const activeLocations = useMemo(() => {
     return (locations || []).filter((location) => location.status === 'Active')
@@ -115,12 +117,12 @@ function MaterialBalanceReport({ locations, assets }) {
 
   const loadReport = async (activeFilters = filters) => {
     if (!activeFilters.locationCode) {
-      alert('Location is required')
+      setErrorMsg('Location is required')
       return
     }
 
     if (!activeFilters.dateFrom || !activeFilters.dateTo) {
-      alert('Date From and Date To are required')
+      setErrorMsg('Date From and Date To are required')
       return
     }
 
@@ -134,7 +136,7 @@ function MaterialBalanceReport({ locations, assets }) {
       setRows(data.rows)
       setCurrentPage(1)
     } catch (error) {
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       setLoading(false)
     }
@@ -152,6 +154,7 @@ function MaterialBalanceReport({ locations, assets }) {
       setTemplate(null)
       setColumns([])
       setRows([])
+      setErrorMsg('')
       return
     }
 
@@ -159,6 +162,7 @@ function MaterialBalanceReport({ locations, assets }) {
       ...filters,
       [name]: value,
     })
+    setErrorMsg('')
   }
 
   const handleApplyFilters = async (e) => {
@@ -285,7 +289,7 @@ function MaterialBalanceReport({ locations, assets }) {
 
   const handleExportCsv = () => {
     if (rows.length === 0) {
-      alert('No Material Balance rows available to export')
+      setErrorMsg('No Material Balance rows available to export')
       return
     }
 
@@ -298,7 +302,7 @@ function MaterialBalanceReport({ locations, assets }) {
 
   const handlePrintReport = () => {
     if (rows.length === 0) {
-      alert('No Material Balance rows available to print')
+      setErrorMsg('No Material Balance rows available to print')
       return
     }
 
@@ -307,6 +311,16 @@ function MaterialBalanceReport({ locations, assets }) {
 
   return (
     <div className="material-balance-report-page">
+      {successMsg && (
+        <div className="success-box" onClick={() => setSuccessMsg('')}>
+          {successMsg}
+        </div>
+      )}
+      {errorMsg && (
+        <div className="error-box" onClick={() => setErrorMsg('')}>
+          {errorMsg}
+        </div>
+      )}
       <div className="page-title">
         <div>
           <h2>Material Balance Report</h2>

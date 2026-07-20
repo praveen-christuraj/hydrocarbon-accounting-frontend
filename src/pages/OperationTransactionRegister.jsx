@@ -19,6 +19,8 @@ function OperationTransactionRegister({
   const [hasMore, setHasMore] = useState(false)
 
   const [loading, setLoading] = useState(false)
+  const [successMsg, setSuccessMsg] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
 
   const [filters, setFilters] = useState({
     searchText: '',
@@ -79,7 +81,7 @@ function OperationTransactionRegister({
       setHasMore(Boolean(data?.has_more))
       setStatusCounts(Array.isArray(data?.status_counts) ? data.status_counts : [])
     } catch (error) {
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       setLoading(false)
     }
@@ -137,7 +139,7 @@ function OperationTransactionRegister({
       setLoading(true)
       await exportOperationTransactionsCsv(filters)
     } catch (error) {
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       setLoading(false)
     }
@@ -153,6 +155,16 @@ function OperationTransactionRegister({
 
   return (
     <div>
+      {successMsg && (
+        <div className="success-box" onClick={() => setSuccessMsg('')}>
+          {successMsg}
+        </div>
+      )}
+      {errorMsg && (
+        <div className="error-box" onClick={() => setErrorMsg('')}>
+          {errorMsg}
+        </div>
+      )}
       <div className="page-title no-print">
         <div>
           <h2>Operation Transaction Register</h2>

@@ -39,6 +39,10 @@ function ShuttleTracking({
   const [filters, setFilters] = useState(defaultFilters)
   const [report, setReport] = useState({ rows: [], totalGroups: 0 })
   const [loading, setLoading] = useState(false)
+  const [successMsg, setSuccessMsg] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
+  const [validationErrors, setValidationErrors] = useState({})
+  const [promptModal, setPromptModal] = useState(null) // { action: 'close'|'reopen', message, value }
 
   const [selectedGroupKey, setSelectedGroupKey] = useState('')
 
@@ -325,7 +329,7 @@ function ShuttleTracking({
         })
         setVesselOps(Array.isArray(data) ? data : [])
       } catch (e) {
-        alert(e.message || 'Unable to load Vessel Operations')
+        setErrorMsg(e.message || 'Unable to load Vessel Operations')
       }
     }
 
@@ -489,7 +493,7 @@ function ShuttleTracking({
         setSelectedGroupKey(still ? still.groupKey : '')
       }
     } catch (e) {
-      alert(e.message || 'Unable to load Shuttle Tracking')
+      setErrorMsg(e.message || 'Unable to load Shuttle Tracking')
     } finally {
       setLoading(false)
     }
@@ -517,7 +521,13 @@ function ShuttleTracking({
   // ----------------------------
   const closeVoyage = async () => {
     if (!selectedGroup) return
-    const closureRemarks = window.prompt('Closure remarks (optional):') || ''
+    setPromptModal({ action: 'close', value: '' })
+  }
+
+  const confirmCloseVoyage = async () => {
+    if (!selectedGroup || !promptModal) return
+    const closureRemarks = promptModal.value || ''
+    setPromptModal(null)
     try {
       setLoading(true)
       await closeShuttleVoyage({
@@ -526,9 +536,10 @@ function ShuttleTracking({
         shuttleAssetCode: selectedGroup.shuttleAssetCode,
         closureRemarks,
       })
+      setSuccessMsg('Voyage closed.')
       await loadTracking()
     } catch (e) {
-      alert(e.message || 'Unable to close voyage')
+      setErrorMsg(e.message || 'Unable to close voyage')
     } finally {
       setLoading(false)
     }
@@ -536,29 +547,32 @@ function ShuttleTracking({
 
   const reopenVoyage = async () => {
     if (!selectedGroup) return
-
     const confirmText = `REOPEN ${selectedGroup.locationCode} | ${selectedGroup.shuttleAssetCode} | ${selectedGroup.shuttleNumber}`
-    const typed = window.prompt(
-      `Type exactly this to reopen:\n\n${confirmText}\n\n(Leave blank to cancel)`
-    )
-    if (String(typed || '').trim() !== confirmText) {
-      alert('Reopen cancelled (confirmation text did not match).')
+    setPromptModal({ action: 'reopen', confirmText, value: '', remarks: '' })
+  }
+
+  const confirmReopenVoyage = async () => {
+    if (!selectedGroup || !promptModal) return
+    const { confirmText, value, remarks } = promptModal
+    if (String(value || '').trim() !== confirmText) {
+      setErrorMsg('Reopen cancelled (confirmation text did not match).')
+      setPromptModal(null)
       return
     }
-
-    const remarks = window.prompt('Reopen remarks (optional):') || ''
-
+    const finalRemarks = remarks || ''
+    setPromptModal(null)
     try {
       setLoading(true)
       await reopenShuttleVoyage({
         locationCode: selectedGroup.locationCode,
         shuttleNumber: selectedGroup.shuttleNumber,
         shuttleAssetCode: selectedGroup.shuttleAssetCode,
-        remarks,
+        remarks: finalRemarks,
       })
+      setSuccessMsg('Voyage reopened.')
       await loadTracking()
     } catch (e) {
-      alert(e.message || 'Unable to reopen voyage')
+      setErrorMsg(e.message || 'Unable to reopen voyage')
     } finally {
       setLoading(false)
     }
@@ -569,7 +583,7 @@ function ShuttleTracking({
   // ----------------------------
   const downloadCsvForSelected = () => {
     if (!selectedGroup) {
-      alert('Select a voyage first')
+      setErrorMsg('Select a voyage first')
       return
     }
 
@@ -630,7 +644,7 @@ function ShuttleTracking({
 
   const exportExcelForSelected = async () => {
     if (!selectedGroup) {
-      alert('Select a voyage first')
+      setErrorMsg('Select a voyage first')
       return
     }
 
@@ -638,7 +652,7 @@ function ShuttleTracking({
       setLoading(true)
       await downloadShuttleVoyageXlsx({ group_key: selectedGroup.groupKey })
     } catch (e) {
-      alert(e.message || 'Unable to export excel')
+      setErrorMsg(e.message || 'Unable to export excel')
     } finally {
       setLoading(false)
     }
@@ -669,23 +683,32 @@ function ShuttleTracking({
 
   const createTicket = async () => {
     if (!selectedGroup) {
-      alert('Select a voyage first')
+      setErrorMsg('Select a voyage first')
       return
     }
 
     if (isVoyageClosed) {
-      alert('This voyage is CLOSED. Reopen voyage to create new tickets.')
+      setErrorMsg('This voyage is CLOSED. Reopen voyage to create new tickets.')
       return
     }
 
-    if (!createForm.operationTemplateId) return alert('Operation Template is required')
-    if (!createForm.operationDate) return alert('Operation Date is required')
-    if (!createForm.vesselOperationCode) return alert('Tracking Operation is required')
+    const valErrors = {}
+    if (!createForm.operationTemplateId) valErrors.operationTemplateId = 'Operation Template is required'
+    if (!createForm.operationDate) valErrors.operationDate = 'Operation Date is required'
+    if (!createForm.vesselOperationCode) valErrors.vesselOperationCode = 'Tracking Operation is required'
+    if (Object.keys(valErrors).length) {
+      setValidationErrors(valErrors)
+      return
+    }
+    setValidationErrors({})
 
     const template = shuttleTemplates.find(
       (t) => String(t.id) === String(createForm.operationTemplateId)
     )
-    if (!template) return alert('Selected template not found')
+    if (!template) {
+      setErrorMsg('Selected template not found')
+      return
+    }
 
     const op = vesselOps.find((o) => o.operation_code === createForm.vesselOperationCode)
 
@@ -767,7 +790,7 @@ function ShuttleTracking({
       const created = await createOperationEntry(entry)
       const createdId = created?.id
 
-      alert('Draft ticket created. Submit & Approve from OTR to appear in tracking.')
+      setSuccessMsg('Draft ticket created. Submit & Approve from OTR to appear in tracking.')
 
       if (createdId) {
         navigate(`/operation-transactions/${createdId}`)
@@ -776,7 +799,7 @@ function ShuttleTracking({
 
       await loadTracking()
     } catch (e) {
-      alert(e.message || 'Unable to create ticket')
+      setErrorMsg(e.message || 'Unable to create ticket')
     } finally {
       setLoading(false)
     }
@@ -810,7 +833,7 @@ function ShuttleTracking({
           }))
         }
       } catch (e) {
-        alert(e.message || 'Unable to load voyage tickets')
+        setErrorMsg(e.message || 'Unable to load voyage tickets')
       } finally {
         setLoading(false)
       }
@@ -827,6 +850,58 @@ function ShuttleTracking({
   // ----------------------------
   return (
     <>
+      {successMsg && (
+        <div className="success-box" onClick={() => setSuccessMsg('')}>
+          {successMsg}
+        </div>
+      )}
+      {errorMsg && (
+        <div className="error-box" onClick={() => setErrorMsg('')}>
+          {errorMsg}
+        </div>
+      )}
+      {promptModal && promptModal.action === 'close' && (
+        <div className="confirm-overlay">
+          <div className="confirm-dialog">
+            <p>Close this voyage?</p>
+            <textarea
+              rows="3"
+              placeholder="Closure remarks (optional)"
+              value={promptModal.value}
+              onChange={(e) => setPromptModal({ ...promptModal, value: e.target.value })}
+            />
+            <div className="confirm-actions">
+              <button onClick={confirmCloseVoyage}>Close Voyage</button>
+              <button onClick={() => setPromptModal(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {promptModal && promptModal.action === 'reopen' && (
+        <div className="confirm-overlay">
+          <div className="confirm-dialog">
+            <p>Type exactly to confirm reopen:</p>
+            <pre style={{ fontSize: 12, background: '#f5f5f5', padding: 8 }}>{promptModal.confirmText}</pre>
+            <input
+              type="text"
+              placeholder="Type the confirmation text above"
+              value={promptModal.value}
+              onChange={(e) => setPromptModal({ ...promptModal, value: e.target.value })}
+            />
+            <textarea
+              rows="2"
+              placeholder="Reopen remarks (optional)"
+              value={promptModal.remarks}
+              onChange={(e) => setPromptModal({ ...promptModal, remarks: e.target.value })}
+              style={{ marginTop: 8 }}
+            />
+            <div className="confirm-actions">
+              <button onClick={confirmReopenVoyage}>Reopen Voyage</button>
+              <button onClick={() => setPromptModal(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="print-only mtr-page">
         {selectedGroup ? (
           <>

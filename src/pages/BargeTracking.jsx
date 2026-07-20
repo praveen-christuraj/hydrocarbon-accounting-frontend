@@ -14,6 +14,11 @@ function BargeTracking({ loggedInUser, assets = [], locations = [] }) {
   const [tracker, setTracker] = useState(null)
   const [timeline, setTimeline] = useState(null)
 
+  const [successMsg, setSuccessMsg] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
+  const [confirmAction, setConfirmAction] = useState(null) // { type, message, data }
+  const [promptModal, setPromptModal] = useState(null) // { type, message, default, value }
+
   const [fixPanel, setFixPanel] = useState({
     open: false,
     assetCode: '',
@@ -95,7 +100,7 @@ function BargeTracking({ loggedInUser, assets = [], locations = [] }) {
   const loadAll = async (cn) => {
     const clean = String(cn || '').trim()
     if (!clean) {
-      alert('Convoy Number is required')
+      setErrorMsg('Convoy Number is required')
       return
     }
 
@@ -109,7 +114,7 @@ function BargeTracking({ loggedInUser, assets = [], locations = [] }) {
     } catch (e) {
       setTracker(null)
       setTimeline(null)
-      alert(e.message || 'Failed to load convoy')
+      setErrorMsg(e.message || 'Failed to load convoy')
     } finally {
       setLoading(false)
     }
@@ -208,7 +213,7 @@ function BargeTracking({ loggedInUser, assets = [], locations = [] }) {
 
   const acknowledgeReceipt = async (assetCode) => {
     if (isTripClosed) {
-      alert('Barge Movement is CLOSED. Reopen it to continue.')
+      setErrorMsg('Barge Movement is CLOSED. Reopen it to continue.')
       return
     }
     if (!tracker?.convoy_number) return
@@ -217,7 +222,7 @@ function BargeTracking({ loggedInUser, assets = [], locations = [] }) {
     if (!assetKey) return
 
     if (isAcknowledged(assetKey)) {
-      alert('Already acknowledged for this asset.')
+      setErrorMsg('Already acknowledged for this asset.')
       return
     }
 
@@ -229,15 +234,21 @@ function BargeTracking({ loggedInUser, assets = [], locations = [] }) {
       ''
 
     if (!receiptLocation) {
-      alert('Could not determine receipt location (destination). Please ensure the load ticket has destination.')
+      setErrorMsg('Could not determine receipt location (destination). Please ensure the load ticket has destination.')
       return
     }
 
-    const ok = window.confirm(
-      `Confirm Acknowledge Receipt?\n\nConvoy: ${tracker.convoy_number}\nBarge: ${assetKey}\nLocation: ${receiptLocation}\n\nThis confirms arrival only (no dips).`
-    )
-    if (!ok) return
+    setConfirmAction({
+      type: 'acknowledge',
+      message: `Confirm Acknowledge Receipt?\n\nConvoy: ${tracker.convoy_number}\nBarge: ${assetKey}\nLocation: ${receiptLocation}\n\nThis confirms arrival only (no dips).`,
+      data: { assetKey, receiptLocation },
+    })
+  }
 
+  const confirmAcknowledge = async () => {
+    if (!confirmAction || !tracker?.convoy_number) return
+    const { assetKey, receiptLocation } = confirmAction.data
+    setConfirmAction(null)
     setLoading(true)
     try {
       await createTripEvent({
@@ -248,9 +259,10 @@ function BargeTracking({ loggedInUser, assets = [], locations = [] }) {
         operationTransactionId: null,
         remarks: 'Receiver acknowledged receipt',
       })
+      setSuccessMsg('Receipt acknowledged.')
       await loadAll(tracker.convoy_number)
     } catch (e) {
-      alert(e.message || 'Failed to acknowledge receipt')
+      setErrorMsg(e.message || 'Failed to acknowledge receipt')
     } finally {
       setLoading(false)
     }
@@ -258,7 +270,7 @@ function BargeTracking({ loggedInUser, assets = [], locations = [] }) {
 
   const revokeReceipt = async (assetCode) => {
     if (isTripClosed) {
-      alert('Barge Movement is CLOSED. Reopen it to continue.')
+      setErrorMsg('Barge Movement is CLOSED. Reopen it to continue.')
       return
     }
     if (!tracker?.convoy_number) return
@@ -267,17 +279,22 @@ function BargeTracking({ loggedInUser, assets = [], locations = [] }) {
     if (!assetKey) return
 
     if (!isAcknowledged(assetKey)) {
-      alert('This barge is not acknowledged yet.')
+      setErrorMsg('This barge is not acknowledged yet.')
       return
     }
 
-    const ok = window.confirm(
-      `Confirm Revoke Receipt?\n\nConvoy: ${tracker.convoy_number}\nBarge: ${assetKey}`
-    )
-    if (!ok) return
+    setConfirmAction({
+      type: 'revoke',
+      message: `Confirm Revoke Receipt?\n\nConvoy: ${tracker.convoy_number}\nBarge: ${assetKey}`,
+      data: { assetKey },
+    })
+  }
 
+  const confirmRevoke = async () => {
+    if (!confirmAction || !tracker?.convoy_number) return
+    const { assetKey } = confirmAction.data
     const lastLoc = receiptStateByAsset?.[assetKey]?.location_code || null
-
+    setConfirmAction(null)
     setLoading(true)
     try {
       await createTripEvent({
@@ -288,9 +305,10 @@ function BargeTracking({ loggedInUser, assets = [], locations = [] }) {
         operationTransactionId: null,
         remarks: 'Receipt acknowledgement revoked',
       })
+      setSuccessMsg('Receipt acknowledgement revoked.')
       await loadAll(tracker.convoy_number)
     } catch (e) {
-      alert(e.message || 'Failed to revoke receipt acknowledgement')
+      setErrorMsg(e.message || 'Failed to revoke receipt acknowledgement')
     } finally {
       setLoading(false)
     }
@@ -300,31 +318,32 @@ function BargeTracking({ loggedInUser, assets = [], locations = [] }) {
     if (!timeline?.trip?.id) return
 
     if (!hasApprovedBargeComparison()) {
-      alert(
+      setErrorMsg(
         'Barge movement can be closed only after comparison is available for every barge in this convoy.\n\n' +
           `Pending barge(s): ${getPendingComparisonAssetCodes().join(', ')}`
       )
       return
     }
 
-    const remarks = window.prompt(
-      `Close Barge Movement?\n\nConvoy: ${timeline.trip.convoy_number}\n\nEnter closure / settlement remarks:`,
-      'Reviewed and closed from Barge Tracking'
-    )
+    setPromptModal({
+      type: 'close',
+      title: `Close Barge Movement?\n\nConvoy: ${timeline.trip.convoy_number}\n\nEnter closure / settlement remarks:`,
+      default: 'Reviewed and closed from Barge Tracking',
+      value: 'Reviewed and closed from Barge Tracking',
+    })
+  }
 
-    if (remarks === null) return
-
+  const confirmCloseBarge = async () => {
+    if (!timeline?.trip?.id || !promptModal) return
+    const remarks = promptModal.value || 'Reviewed and closed from Barge Tracking'
+    setPromptModal(null)
     setLoading(true)
-
     try {
-      await closeTrip(
-        timeline.trip.id,
-        remarks || 'Reviewed and closed from Barge Tracking'
-      )
-
+      await closeTrip(timeline.trip.id, remarks)
+      setSuccessMsg('Barge movement closed.')
       await loadAll(timeline.trip.convoy_number)
     } catch (e) {
-      alert(e.message || 'Failed to close barge movement')
+      setErrorMsg(e.message || 'Failed to close barge movement')
     } finally {
       setLoading(false)
     }
@@ -333,24 +352,25 @@ function BargeTracking({ loggedInUser, assets = [], locations = [] }) {
   const handleReopenBargeMovement = async () => {
     if (!timeline?.trip?.id) return
 
-    const remarks = window.prompt(
-      `Reopen Barge Movement?\n\nConvoy: ${timeline.trip.convoy_number}\n\nEnter reopen remarks:`,
-      'Reopened from Barge Tracking'
-    )
+    setPromptModal({
+      type: 'reopen',
+      title: `Reopen Barge Movement?\n\nConvoy: ${timeline.trip.convoy_number}\n\nEnter reopen remarks:`,
+      default: 'Reopened from Barge Tracking',
+      value: 'Reopened from Barge Tracking',
+    })
+  }
 
-    if (remarks === null) return
-
+  const confirmReopenBarge = async () => {
+    if (!timeline?.trip?.id || !promptModal) return
+    const remarks = promptModal.value || 'Reopened from Barge Tracking'
+    setPromptModal(null)
     setLoading(true)
-
     try {
-      await reopenTrip(
-        timeline.trip.id,
-        remarks || 'Reopened from Barge Tracking'
-      )
-
+      await reopenTrip(timeline.trip.id, remarks)
+      setSuccessMsg('Barge movement reopened.')
       await loadAll(timeline.trip.convoy_number)
     } catch (e) {
-      alert(e.message || 'Failed to reopen barge movement')
+      setErrorMsg(e.message || 'Failed to reopen barge movement')
     } finally {
       setLoading(false)
     }
@@ -358,12 +378,12 @@ function BargeTracking({ loggedInUser, assets = [], locations = [] }) {
 
   const openFixPanel = (assetCode) => {
     if (isTripClosed) {
-      alert('Barge Movement is CLOSED. Reopen it to continue.')
+      setErrorMsg('Barge Movement is CLOSED. Reopen it to continue.')
       return
     }
     const convoy = tracker?.convoy_number || String(convoyNumber || '').trim()
     if (!convoy) {
-      alert('Please search convoy first.')
+      setErrorMsg('Please search convoy first.')
       return
     }
 
@@ -392,7 +412,7 @@ function BargeTracking({ loggedInUser, assets = [], locations = [] }) {
 
   const saveFixPanel = async () => {
     if (isTripClosed) {
-      alert('Barge Movement is CLOSED. Reopen it to continue.')
+      setErrorMsg('Barge Movement is CLOSED. Reopen it to continue.')
       return
     }
 
@@ -401,15 +421,22 @@ function BargeTracking({ loggedInUser, assets = [], locations = [] }) {
     const txIdRaw = String(fixPanel.transactionId || '').trim()
 
     if (!convoy || !assetCode || !txIdRaw) {
-      alert('Please select a ticket to add to timeline.')
+      setErrorMsg('Please select a ticket to add to timeline.')
       return
     }
 
-    const ok = window.confirm(
-      `Fix Timeline (Admin)\n\nConvoy: ${convoy}\nBarge: ${assetCode}\nTicket ID: ${txIdRaw}\nEvent: ${fixPanel.eventType}\n\nUse this only if a ticket is missing in timeline or needs correction.`
-    )
-    if (!ok) return
+    setConfirmAction({
+      type: 'fix-timeline',
+      message: `Fix Timeline (Admin)\n\nConvoy: ${convoy}\nBarge: ${assetCode}\nTicket ID: ${txIdRaw}\nEvent: ${fixPanel.eventType}\n\nUse this only if a ticket is missing in timeline or needs correction.`,
+    })
+  }
 
+  const confirmFixTimeline = async () => {
+    if (!confirmAction || confirmAction.type !== 'fix-timeline') return
+    setConfirmAction(null)
+    const convoy = String(fixPanel.convoyNumber || '').trim()
+    const assetCode = String(fixPanel.assetCode || '').trim()
+    const txIdRaw = String(fixPanel.transactionId || '').trim()
     setLoading(true)
     try {
       await createTripEvent({
@@ -421,9 +448,10 @@ function BargeTracking({ loggedInUser, assets = [], locations = [] }) {
         remarks: fixPanel.remarks || 'Manual timeline fix',
       })
       closeFixPanel()
+      setSuccessMsg('Timeline updated.')
       await loadAll(convoy)
     } catch (e) {
-      alert(e.message || 'Failed to tag ticket')
+      setErrorMsg(e.message || 'Failed to tag ticket')
     } finally {
       setLoading(false)
     }
@@ -470,6 +498,43 @@ function BargeTracking({ loggedInUser, assets = [], locations = [] }) {
   }
 return (
     <div>
+      {successMsg && (
+        <div className="success-box" onClick={() => setSuccessMsg('')}>
+          {successMsg}
+        </div>
+      )}
+      {errorMsg && (
+        <div className="error-box" onClick={() => setErrorMsg('')}>
+          {errorMsg}
+        </div>
+      )}
+      {confirmAction && (
+        <div className="confirm-overlay">
+          <div className="confirm-dialog">
+            <p>{confirmAction.message}</p>
+            <div className="confirm-actions">
+              <button onClick={confirmAction.type === 'acknowledge' ? confirmAcknowledge : confirmAction.type === 'revoke' ? confirmRevoke : confirmFixTimeline}>Yes</button>
+              <button onClick={() => setConfirmAction(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {promptModal && (
+        <div className="confirm-overlay">
+          <div className="confirm-dialog">
+            <p>{promptModal.title}</p>
+            <textarea
+              rows="3"
+              value={promptModal.value}
+              onChange={(e) => setPromptModal({ ...promptModal, value: e.target.value })}
+            />
+            <div className="confirm-actions">
+              <button onClick={promptModal.type === 'close' ? confirmCloseBarge : confirmReopenBarge}>Confirm</button>
+              <button onClick={() => setPromptModal(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Compact Barge MTR / Reconciliation Report */}
       {printReport.open && printReport.comparison && (

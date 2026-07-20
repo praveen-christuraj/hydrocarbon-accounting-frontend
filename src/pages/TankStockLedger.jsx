@@ -28,6 +28,8 @@ function TankStockLedger({ locations, assets }) {
   const [dailySummaryPage, setDailySummaryPage] = useState(1)
   const [stockSummaryPage, setStockSummaryPage] = useState(1)
   const [ledgerDetailsPage, setLedgerDetailsPage] = useState(1)
+  const [successMsg, setSuccessMsg] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
 
   const activeLocations = useMemo(() => {
     return (locations || []).filter((location) => location.status === 'Active')
@@ -151,7 +153,7 @@ function TankStockLedger({ locations, assets }) {
       setStockSummaryPage(1)
       setLedgerDetailsPage(1)
     } catch (error) {
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       setLoading(false)
     }
@@ -259,7 +261,7 @@ function TankStockLedger({ locations, assets }) {
 
   const handleExportDailySummaryCsv = () => {
     if (dailySummaryRows.length === 0) {
-      alert('No Daily Summary rows available to export')
+      setErrorMsg('No Daily Summary rows available to export')
       return
     }
 
@@ -306,7 +308,7 @@ function TankStockLedger({ locations, assets }) {
 
   const handleExportStockSummaryCsv = () => {
     if (summaryRows.length === 0) {
-      alert('No Stock Summary rows available to export')
+      setErrorMsg('No Stock Summary rows available to export')
       return
     }
 
@@ -343,7 +345,7 @@ function TankStockLedger({ locations, assets }) {
 
   const handleExportLedgerDetailsCsv = () => {
     if (ledgerRows.length === 0) {
-      alert('No Ledger Detail rows available to export')
+      setErrorMsg('No Ledger Detail rows available to export')
       return
     }
 
@@ -412,6 +414,16 @@ function TankStockLedger({ locations, assets }) {
 
   return (
     <div>
+      {successMsg && (
+        <div className="success-box" onClick={() => setSuccessMsg('')}>
+          {successMsg}
+        </div>
+      )}
+      {errorMsg && (
+        <div className="error-box" onClick={() => setErrorMsg('')}>
+          {errorMsg}
+        </div>
+      )}
       <div className="page-title">
         <div>
           <h2>Tank Stock Ledger</h2>

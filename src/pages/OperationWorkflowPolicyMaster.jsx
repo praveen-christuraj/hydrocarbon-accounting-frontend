@@ -23,6 +23,9 @@ function OperationWorkflowPolicyMaster({ roles = [], operationTypes = [], operat
   const [form, setForm] = useState(empty)
   const [editId, setEditId] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [successMsg, setSuccessMsg] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null)
 
   const activeRoles = useMemo(() => roles.filter((r) => r.status === 'Active'), [roles])
 
@@ -34,8 +37,14 @@ function OperationWorkflowPolicyMaster({ roles = [], operationTypes = [], operat
 
   const onSubmit = async (e) => {
     e.preventDefault()
-    if (!form.policyName.trim()) return alert('Policy Name is required')
-    if (!form.actionCode.trim()) return alert('Action is required')
+    if (!form.policyName.trim()) {
+      setErrorMsg('Policy Name is required')
+      return
+    }
+    if (!form.actionCode.trim()) {
+      setErrorMsg('Action is required')
+      return
+    }
     setLoading(true)
     try {
       let createdOrUpdated
@@ -59,10 +68,10 @@ function OperationWorkflowPolicyMaster({ roles = [], operationTypes = [], operat
       await load()
       setForm(empty)
       setEditId(null)
-      alert(editId ? 'Workflow policy updated' : 'Workflow policy created')
+      setSuccessMsg(editId ? 'Workflow policy updated' : 'Workflow policy created')
       return createdOrUpdated
     } catch (err) {
-      alert(err.message)
+      setErrorMsg(err.message)
     } finally {
       setLoading(false)
     }
@@ -93,16 +102,43 @@ function OperationWorkflowPolicyMaster({ roles = [], operationTypes = [], operat
   }
 
   const onDelete = async (id) => {
-    if (!window.confirm('Delete this workflow policy?')) return
-    await deleteOperationWorkflowPolicy(id)
+    setConfirmDeleteId(id)
+  }
+
+  const confirmDeletePolicy = async () => {
+    if (!confirmDeleteId) return
+    await deleteOperationWorkflowPolicy(confirmDeleteId)
+    setConfirmDeleteId(null)
+    setSuccessMsg('Workflow policy deleted.')
     await load()
   }
 
   return (
     <div>
+      {successMsg && (
+        <div className="success-box" onClick={() => setSuccessMsg('')}>
+          {successMsg}
+        </div>
+      )}
+      {errorMsg && (
+        <div className="error-box" onClick={() => setErrorMsg('')}>
+          {errorMsg}
+        </div>
+      )}
+      {confirmDeleteId && (
+        <div className="confirm-overlay">
+          <div className="confirm-dialog">
+            <p>Delete this workflow policy?</p>
+            <div className="confirm-actions">
+              <button onClick={confirmDeletePolicy}>Yes, Delete</button>
+              <button onClick={() => setConfirmDeleteId(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="page-title"><div><h2>Operation Workflow Policy</h2><p>Soft-code who can submit/review/approve/reject/cancel/recall by context.</p></div></div>
       <form onSubmit={onSubmit}>
-        <div><label>Policy Name</label><input value={form.policyName} onChange={(e) => setForm({ ...form, policyName: e.target.value })} /></div>
+        <div><label>Policy Name</label><input value={form.policyName} onChange={(e) => { setForm({ ...form, policyName: e.target.value }); setErrorMsg(''); }} /></div>
         <div><label>Action</label><select value={form.actionCode} onChange={(e) => setForm({ ...form, actionCode: e.target.value })}><option>CREATE_ENTRY</option><option>EDIT_DRAFT</option><option>REVIEW</option><option>SUBMIT</option><option>APPROVE</option><option>REJECT</option><option>CANCEL</option><option>RECALL</option></select></div>
         <div><label>Operation Type</label><select value={form.operationTypeCode} onChange={(e) => setForm({ ...form, operationTypeCode: e.target.value })}><option value="">Any</option>{operationTypes.map((o) => <option key={o.id} value={o.operationTypeCode}>{o.operationTypeName}</option>)}</select></div>
         <div><label>Operation Template</label><select value={form.operationTemplateId} onChange={(e) => setForm({ ...form, operationTemplateId: e.target.value })}><option value="">Any</option>{operationTemplates.map((t) => <option key={t.id} value={t.id}>{t.templateName}</option>)}</select></div>

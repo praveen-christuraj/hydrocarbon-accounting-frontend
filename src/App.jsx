@@ -676,6 +676,7 @@ function AppContent({
                   locations={locations}
                   assets={assets}
                   assetAssignments={assetAssignments}
+                  loggedInUser={loggedInUser}
                 />
               </PermissionGuard>
             }
@@ -718,6 +719,7 @@ function AppContent({
                   roles={roles}
                   users={users}
                   locations={locations}
+                  loggedInUser={loggedInUser}
                 />
               </PermissionGuard>
             }
@@ -1173,7 +1175,7 @@ function App() {
   const reloadUsers = async () => {
     try {
       const usersFromApi = await getUsers()
-      setUsers(usersFromApi)
+      setUsers(usersFromApi.items)
     } catch (error) {
       console.error(error)
       alert('Unable to load users from backend')
@@ -1183,7 +1185,7 @@ function App() {
   const reloadRoles = async () => {
     try {
       const rolesFromApi = await getRoles()
-      setRoles(rolesFromApi)
+      setRoles(rolesFromApi.items)
     } catch (error) {
       console.error(error)
       alert('Unable to load roles from backend')
@@ -1193,7 +1195,7 @@ function App() {
   const reloadPermissions = async () => {
     try {
       const permissionsFromApi = await getPermissions()
-      setPermissions(permissionsFromApi)
+      setPermissions(permissionsFromApi.items)
     } catch (error) {
       console.error(error)
       alert('Unable to load permissions from backend')
@@ -1223,7 +1225,7 @@ function App() {
   const reloadLocations = async () => {
     try {
       const locationsFromApi = await getLocations()
-      setLocations(locationsFromApi)
+      setLocations(locationsFromApi.items)
     } catch (error) {
       console.error(error)
       alert('Unable to load locations from backend')
@@ -1233,7 +1235,7 @@ function App() {
   const reloadAssetTypes = async () => {
     try {
       const assetTypesFromApi = await getAssetTypes()
-      setAssetTypes(assetTypesFromApi)
+      setAssetTypes(assetTypesFromApi.items)
     } catch (error) {
       console.error(error)
       alert('Unable to load asset types from backend')
@@ -1243,7 +1245,7 @@ function App() {
   const reloadAssets = async () => {
     try {
       const assetsFromApi = await getAssets()
-      setAssets(assetsFromApi)
+      setAssets(assetsFromApi.items)
     } catch (error) {
       console.error(error)
       alert('Unable to load assets from backend')

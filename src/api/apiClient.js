@@ -1,4 +1,5 @@
-import { clearAccessToken, getStoredAccessToken } from './authApi'
+import { clearAccessToken, getStoredAccessToken } from './authToken'
+import { refreshAccessToken } from './authApi'
 
 export const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
@@ -27,6 +28,36 @@ const readResponseData = async (response) => {
   return null
 }
 
+// Track whether a refresh is in flight to avoid duplicate calls
+let refreshPromise = null
+
+const tryRefreshAndRetry = async (endpoint, options) => {
+  // Only one concurrent refresh attempt
+  if (!refreshPromise) {
+    refreshPromise = refreshAccessToken().finally(() => {
+      refreshPromise = null
+    })
+  }
+
+  const refreshed = await refreshPromise
+  if (!refreshed) {
+    clearAccessToken()
+    throw new Error('Session expired. Please login again.')
+  }
+
+  // Retry original request with new token
+  const retryResponse = await fetch(`${API_BASE_URL}${endpoint}`, {
+    ...options,
+    headers: buildHeaders(options.headers || {}),
+  })
+
+  const retryData = await readResponseData(retryResponse)
+  if (!retryResponse.ok) {
+    throw new Error(retryData?.detail || 'API request failed')
+  }
+  return retryData
+}
+
 export const apiRequest = async (endpoint, options = {}) => {
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
@@ -36,7 +67,16 @@ export const apiRequest = async (endpoint, options = {}) => {
   const data = await readResponseData(response)
 
   if (!response.ok) {
+    // On 401, try to silently refresh the token and retry once
     if (response.status === 401) {
+      // Don't try refresh for auth endpoints themselves (prevent loops)
+      const isAuthEndpoint =
+        endpoint.startsWith('/auth/login') ||
+        endpoint.startsWith('/auth/2fa/verify') ||
+        endpoint.startsWith('/auth/refresh')
+      if (!isAuthEndpoint) {
+        return tryRefreshAndRetry(endpoint, options)
+      }
       clearAccessToken()
     }
 
@@ -93,16 +133,36 @@ export const apiDownload = async (endpoint, filename) => {
   })
 
   if (!response.ok) {
+    // Auto-refresh for downloads too
+    if (response.status === 401) {
+      const refreshed = await refreshAccessToken()
+      if (refreshed) {
+        const newToken = getStoredAccessToken()
+        const retryResponse = await fetch(`${API_BASE_URL}${endpoint}`, {
+          headers: newToken ? { Authorization: `Bearer ${newToken}` } : {},
+        })
+        if (retryResponse.ok) {
+          return handleDownloadBlob(retryResponse, filename)
+        }
+      }
+      clearAccessToken()
+      throw new Error('Session expired. Please login again.')
+    }
+
     let message = 'Download failed'
     try {
-      const data = await response.json()
-      message = data?.detail || message
+      const errorData = await response.json()
+      message = errorData?.detail || message
     } catch {
       // Keep generic message for non-JSON errors.
     }
     throw new Error(message)
   }
 
+  return handleDownloadBlob(response, filename)
+}
+
+const handleDownloadBlob = async (response, filename) => {
   const blob = await response.blob()
   const disposition = response.headers.get('content-disposition') || ''
   const match = disposition.match(/filename="?([^";]+)"?/i)

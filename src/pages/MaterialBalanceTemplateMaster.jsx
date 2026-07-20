@@ -57,6 +57,12 @@ function MaterialBalanceTemplateMaster({ locations }) {
   const [loading, setLoading] = useState(false)
   const [savingTemplate, setSavingTemplate] = useState(false)
   const [savingColumn, setSavingColumn] = useState(false)
+  const [successMsg, setSuccessMsg] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
+  const [validationErrors, setValidationErrors] = useState({})
+  const [confirmDeleteTemplateItem, setConfirmDeleteTemplateItem] = useState(null)
+  const [confirmDeleteColumnItem, setConfirmDeleteColumnItem] = useState(null)
+  const [confirmAddStandard, setConfirmAddStandard] = useState(false)
 
   const activeLocations = useMemo(() => {
     return (locations || []).filter((location) => location.status === 'Active')
@@ -89,6 +95,8 @@ function MaterialBalanceTemplateMaster({ locations }) {
   const loadTemplates = async (locationCode = templateForm.locationCode) => {
     try {
       setLoading(true)
+      setSuccessMsg('')
+      setErrorMsg('')
 
       const data = await getMaterialBalanceTemplates({
         locationCode,
@@ -96,7 +104,7 @@ function MaterialBalanceTemplateMaster({ locations }) {
 
       setTemplates(data)
     } catch (error) {
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       setLoading(false)
     }
@@ -116,13 +124,15 @@ function MaterialBalanceTemplateMaster({ locations }) {
 
       setTankOperations(data)
     } catch (error) {
-      alert(error.message)
+      setErrorMsg(error.message)
     }
   }
 
   const loadTemplateDetail = async (templateId) => {
     try {
       setLoading(true)
+      setSuccessMsg('')
+      setErrorMsg('')
 
       const data = await getMaterialBalanceTemplateDetail(templateId)
       setSelectedTemplate(data)
@@ -136,7 +146,7 @@ function MaterialBalanceTemplateMaster({ locations }) {
       setColumnForm(emptyColumnForm)
       await loadTankOperations(data.locationCode)
     } catch (error) {
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       setLoading(false)
     }
@@ -266,14 +276,23 @@ function MaterialBalanceTemplateMaster({ locations }) {
 
   const handleSaveTemplate = async (e) => {
     e.preventDefault()
+    setSuccessMsg('')
+    setErrorMsg('')
+    setValidationErrors({})
+
+    const errors = {}
 
     if (!templateForm.locationCode) {
-      alert('Location is required')
-      return
+      errors.locationCode = 'Location is required'
     }
 
     if (!templateForm.templateName.trim()) {
-      alert('Template Name is required')
+      errors.templateName = 'Template Name is required'
+    }
+
+    setValidationErrors(errors)
+
+    if (Object.keys(errors).length > 0) {
       return
     }
 
@@ -293,9 +312,9 @@ function MaterialBalanceTemplateMaster({ locations }) {
 
       await loadTemplates(templateForm.locationCode)
       await loadTemplateDetail(savedTemplate.id)
-      alert('Material Balance Template saved successfully')
+      setSuccessMsg('Material Balance Template saved successfully')
     } catch (error) {
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       setSavingTemplate(false)
     }
@@ -310,63 +329,61 @@ function MaterialBalanceTemplateMaster({ locations }) {
     setColumnForm(emptyColumnForm)
   }
 
-  const handleDeleteTemplate = async (template) => {
-    const confirmed = window.confirm(
-      `Delete Material Balance Template "${template.templateName}"?`
-    )
-
-    if (!confirmed) {
-      return
-    }
+  const confirmDeleteTemplate = async () => {
+    setSuccessMsg('')
+    setErrorMsg('')
 
     try {
-      await deleteMaterialBalanceTemplate(template.id)
+      await deleteMaterialBalanceTemplate(confirmDeleteTemplateItem.id)
       setSelectedTemplate(null)
       setTemplateForm({
         ...emptyTemplateForm,
         locationCode: templateForm.locationCode,
       })
       setColumnForm(emptyColumnForm)
-      await loadTemplates(template.locationCode)
-      alert('Material Balance Template deleted successfully')
+      setConfirmDeleteTemplateItem(null)
+      await loadTemplates(confirmDeleteTemplateItem.locationCode)
+      setSuccessMsg('Material Balance Template deleted successfully')
     } catch (error) {
-      alert(error.message)
+      setErrorMsg(error.message)
     }
   }
 
   const validateColumnBeforeSave = () => {
+    const errors = {}
+
     if (!selectedTemplate?.id) {
-      alert('Please select or save a template first')
+      setErrorMsg('Please select or save a template first')
       return false
     }
 
     if (!columnForm.columnLabel.trim()) {
-      alert('Column Label is required')
-      return false
+      errors.columnLabel = 'Column Label is required'
     }
 
     if (!columnForm.columnKey.trim()) {
-      alert('Column Key is required')
-      return false
+      errors.columnKey = 'Column Key is required'
     }
 
     if (columnForm.columnType === 'MOVEMENT') {
       if (!columnForm.movementDirection) {
-        alert('Movement Direction is required for MOVEMENT columns')
-        return false
+        errors.movementDirection = 'Movement Direction is required for MOVEMENT columns'
       }
 
       if (columnForm.mappedOperationCodes.length === 0) {
-        alert('Select at least one mapped Tank Operation')
-        return false
+        errors.mappedOperationCodes = 'Select at least one mapped Tank Operation'
       }
     }
 
-    return true
+    setValidationErrors(errors)
+    return Object.keys(errors).length === 0
   }
 
   const handleSaveColumn = async (e) => {
     e.preventDefault()
+    setSuccessMsg('')
+    setErrorMsg('')
+    setValidationErrors({})
 
     if (!validateColumnBeforeSave()) {
       return
@@ -386,9 +403,9 @@ function MaterialBalanceTemplateMaster({ locations }) {
 
       await loadTemplateDetail(selectedTemplate.id)
       setColumnForm(emptyColumnForm)
-      alert('Material Balance column saved successfully')
+      setSuccessMsg('Material Balance column saved successfully')
     } catch (error) {
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       setSavingColumn(false)
     }
@@ -403,37 +420,23 @@ function MaterialBalanceTemplateMaster({ locations }) {
     })
   }
 
-  const handleDeleteColumn = async (column) => {
-    const confirmed = window.confirm(
-      `Delete column "${column.columnLabel}" from this template?`
-    )
-
-    if (!confirmed) {
-      return
-    }
+  const confirmDeleteColumn = async () => {
+    setSuccessMsg('')
+    setErrorMsg('')
 
     try {
-      await deleteMaterialBalanceTemplateColumn(column.id)
+      await deleteMaterialBalanceTemplateColumn(confirmDeleteColumnItem.id)
+      setConfirmDeleteColumnItem(null)
       await loadTemplateDetail(selectedTemplate.id)
-      alert('Material Balance column deleted successfully')
+      setSuccessMsg('Material Balance column deleted successfully')
     } catch (error) {
-      alert(error.message)
+      setErrorMsg(error.message)
     }
   }
 
-  const handleAddStandardColumns = async () => {
-    if (!selectedTemplate?.id) {
-      alert('Please select or save a template first')
-      return
-    }
-
-    const confirmed = window.confirm(
-      'Add standard columns: Opening Stock, Book Closing Stock, Closing Stock, Loss/Gain?'
-    )
-
-    if (!confirmed) {
-      return
-    }
+  const executeAddStandardColumns = async () => {
+    setSuccessMsg('')
+    setErrorMsg('')
 
     const standardColumns = [
       {
@@ -503,10 +506,11 @@ function MaterialBalanceTemplateMaster({ locations }) {
         await createMaterialBalanceTemplateColumn(selectedTemplate.id, column)
       }
 
+      setConfirmAddStandard(false)
       await loadTemplateDetail(selectedTemplate.id)
-      alert('Standard columns added successfully')
+      setSuccessMsg('Standard columns added successfully')
     } catch (error) {
-      alert(error.message)
+      setErrorMsg(error.message)
     }
   }
 
@@ -617,6 +621,50 @@ function MaterialBalanceTemplateMaster({ locations }) {
         excluded from Material Balance and Book Closing.
       </div>
 
+      {successMsg && (
+        <div className="success-box">{successMsg}</div>
+      )}
+
+      {errorMsg && (
+        <div className="error-box">{errorMsg}</div>
+      )}
+
+      {confirmDeleteTemplateItem && (
+        <div className="confirm-overlay">
+          <div className="confirm-box">
+            <p>Delete Material Balance Template "<strong>{confirmDeleteTemplateItem.templateName}</strong>"?</p>
+            <div className="confirm-actions">
+              <button onClick={confirmDeleteTemplate}>Yes, Delete</button>
+              <button onClick={() => setConfirmDeleteTemplateItem(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmDeleteColumnItem && (
+        <div className="confirm-overlay">
+          <div className="confirm-box">
+            <p>Delete column "<strong>{confirmDeleteColumnItem.columnLabel}</strong>" from this template?</p>
+            <div className="confirm-actions">
+              <button onClick={confirmDeleteColumn}>Yes, Delete</button>
+              <button onClick={() => setConfirmDeleteColumnItem(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmAddStandard && (
+        <div className="confirm-overlay">
+          <div className="confirm-box">
+            <p>Add standard columns: Opening Stock, Book Closing Stock, Closing Stock, Loss/Gain?</p>
+            <div className="confirm-actions">
+              <button onClick={executeAddStandardColumns}>Yes, Add</button>
+              <button onClick={() => setConfirmAddStandard(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <form onSubmit={handleSaveTemplate}>
         <div>
           <label>Location</label>
@@ -625,6 +673,7 @@ function MaterialBalanceTemplateMaster({ locations }) {
             value={templateForm.locationCode}
             onChange={handleTemplateChange}
             disabled={savingTemplate || loading}
+            className={validationErrors.locationCode ? 'input-error' : ''}
           >
             <option value="">Select Location</option>
 
@@ -634,6 +683,9 @@ function MaterialBalanceTemplateMaster({ locations }) {
               </option>
             ))}
           </select>
+          {validationErrors.locationCode && (
+            <span className="field-error">{validationErrors.locationCode}</span>
+          )}
         </div>
 
         <div>
@@ -642,10 +694,14 @@ function MaterialBalanceTemplateMaster({ locations }) {
             name="templateName"
             type="text"
             value={templateForm.templateName}
-            onChange={handleTemplateChange}
+            onChange={(e) => { handleTemplateChange(e); setValidationErrors({ ...validationErrors, templateName: '' }) }}
             placeholder="Example: UTP Daily Material Balance"
             disabled={savingTemplate}
+            className={validationErrors.templateName ? 'input-error' : ''}
           />
+          {validationErrors.templateName && (
+            <span className="field-error">{validationErrors.templateName}</span>
+          )}
         </div>
 
         <div>
@@ -730,7 +786,7 @@ function MaterialBalanceTemplateMaster({ locations }) {
 
                   <button
                     type="button"
-                    onClick={() => handleDeleteTemplate(template)}
+                    onClick={() => { setSuccessMsg(''); setErrorMsg(''); setConfirmDeleteTemplateItem(template) }}
                   >
                     Delete
                   </button>
@@ -757,36 +813,12 @@ function MaterialBalanceTemplateMaster({ locations }) {
               {selectedTemplate.locationCode})
             </strong>
 
-            <button type="button" onClick={handleAddStandardColumns}>
+            <button type="button" onClick={() => { setSuccessMsg(''); setErrorMsg(''); setConfirmAddStandard(true) }}>
               Add Standard Columns
             </button>
           </div>
 
           <form onSubmit={handleSaveColumn}>
-            <div>
-              <label>Column Label</label>
-              <input
-                name="columnLabel"
-                type="text"
-                value={columnForm.columnLabel}
-                onChange={handleColumnChange}
-                placeholder="Example: Receipt from X"
-                disabled={savingColumn}
-              />
-            </div>
-
-            <div>
-              <label>Column Key</label>
-              <input
-                name="columnKey"
-                type="text"
-                value={columnForm.columnKey}
-                onChange={handleColumnChange}
-                placeholder="Example: RECEIPT_FROM_X"
-                disabled={savingColumn}
-              />
-            </div>
-
             <div>
               <label>Column Order</label>
               <input
@@ -902,6 +934,44 @@ function MaterialBalanceTemplateMaster({ locations }) {
 
             {renderOperationCheckboxes()}
 
+            <div>
+              <label>Column Label</label>
+              <input
+                name="columnLabel"
+                type="text"
+                value={columnForm.columnLabel}
+                onChange={(e) => { handleColumnChange(e); setValidationErrors({ ...validationErrors, columnLabel: '' }) }}
+                placeholder="Example: Receipt from X"
+                disabled={savingColumn}
+                className={validationErrors.columnLabel ? 'input-error' : ''}
+              />
+              {validationErrors.columnLabel && (
+                <span className="field-error">{validationErrors.columnLabel}</span>
+              )}
+            </div>
+
+            <div>
+              <label>Column Key</label>
+              <input
+                name="columnKey"
+                type="text"
+                value={columnForm.columnKey}
+                onChange={(e) => { handleColumnChange(e); setValidationErrors({ ...validationErrors, columnKey: '' }) }}
+                placeholder="Example: RECEIPT_FROM_X"
+                disabled={savingColumn}
+                className={validationErrors.columnKey ? 'input-error' : ''}
+              />
+              {validationErrors.columnKey && (
+                <span className="field-error">{validationErrors.columnKey}</span>
+              )}
+            </div>
+
+            {validationErrors.mappedOperationCodes && (
+              <div className="full-width-field">
+                <span className="field-error">{validationErrors.mappedOperationCodes}</span>
+              </div>
+            )}
+
             <div className="form-actions">
               <button type="submit" disabled={savingColumn}>
                 {savingColumn
@@ -982,7 +1052,7 @@ function MaterialBalanceTemplateMaster({ locations }) {
 
                       <button
                         type="button"
-                        onClick={() => handleDeleteColumn(column)}
+                        onClick={() => { setSuccessMsg(''); setErrorMsg(''); setConfirmDeleteColumnItem(column) }}
                       >
                         Delete
                       </button>

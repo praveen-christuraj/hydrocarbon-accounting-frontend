@@ -31,6 +31,10 @@ function MovementMapping({ locations = [] }) {
   }
 
   const [loading, setLoading] = useState(false)
+  const [successMsg, setSuccessMsg] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
+  const [confirmRemoveItem, setConfirmRemoveItem] = useState(null)
+  const [confirmCloseMap, setConfirmCloseMap] = useState(false)
 
   const [filters, setFilters] = useState({
     mapping_type: '',
@@ -69,7 +73,7 @@ function MovementMapping({ locations = [] }) {
       const data = await getMovementMappings(filters)
       setMappings(Array.isArray(data) ? data : [])
     } catch (e) {
-      alert(e.message || 'Unable to load movement mappings')
+      setErrorMsg(e.message || 'Unable to load movement mappings')
     } finally {
       setLoading(false)
     }
@@ -82,7 +86,7 @@ function MovementMapping({ locations = [] }) {
       setSelectedMapping(data)
       setSelectedMappingId(id)
     } catch (e) {
-      alert(e.message || 'Unable to load mapping')
+      setErrorMsg(e.message || 'Unable to load mapping')
     } finally {
       setLoading(false)
     }
@@ -139,7 +143,7 @@ function MovementMapping({ locations = [] }) {
         })
         setMappings(Array.isArray(data) ? data : [])
       } catch (e) {
-        alert(e.message || 'Unable to load movement mappings')
+        setErrorMsg(e.message || 'Unable to load movement mappings')
       } finally {
         setLoading(false)
       }
@@ -173,11 +177,13 @@ function MovementMapping({ locations = [] }) {
   const onFilterChange = (e) => {
     const { name, value } = e.target
     setFilters((c) => ({ ...c, [name]: value }))
+    if (errorMsg) setErrorMsg('')
   }
 
   const onCreateFormChange = (e) => {
     const { name, value } = e.target
     setCreateForm((c) => ({ ...c, [name]: value }))
+    if (errorMsg) setErrorMsg('')
   }
 
   const createNew = async () => {
@@ -186,9 +192,9 @@ function MovementMapping({ locations = [] }) {
       const created = await createMovementMapping(createForm)
       await loadList()
       await loadMapping(created.id)
-      alert('Mapping created')
+      setSuccessMsg('Mapping created')
     } catch (e) {
-      alert(e.message || 'Unable to create mapping')
+      setErrorMsg(e.message || 'Unable to create mapping')
     } finally {
       setLoading(false)
     }
@@ -197,7 +203,7 @@ function MovementMapping({ locations = [] }) {
   const loadBargeUnloads = async (convoyOverride) => {
     const convoy = String(convoyOverride ?? convoyNumber ?? '').trim()
     if (!convoy) {
-      alert('Enter Convoy Number')
+      setErrorMsg('Enter Convoy Number')
       return
     }
 
@@ -221,7 +227,7 @@ function MovementMapping({ locations = [] }) {
       setBargeUnloadCandidates(rows)
       setSelectedSourceTxIds([])
     } catch (e) {
-      alert(e.message || 'Unable to load barge UNLOAD candidates')
+      setErrorMsg(e.message || 'Unable to load barge UNLOAD candidates')
     } finally {
       setLoading(false)
     }
@@ -234,7 +240,7 @@ function MovementMapping({ locations = [] }) {
       setTxCandidates(results)
       setSelectedTargetTxIds([])
     } catch (e) {
-      alert(e.message || 'Unable to search approved transactions')
+      setErrorMsg(e.message || 'Unable to search approved transactions')
     } finally {
       setLoading(false)
     }
@@ -242,12 +248,12 @@ function MovementMapping({ locations = [] }) {
 
   const addItems = async (role, ids) => {
     if (!selectedMappingId) {
-      alert('Select a mapping first')
+      setErrorMsg('Select a mapping first')
       return
     }
 
     if (!ids || ids.length === 0) {
-      alert('Select at least one ticket')
+      setErrorMsg('Select at least one ticket')
       return
     }
 
@@ -260,43 +266,53 @@ function MovementMapping({ locations = [] }) {
       setSelectedMapping(updated)
       await loadList()
     } catch (e) {
-      alert(e.message || 'Unable to add items')
+      setErrorMsg(e.message || 'Unable to add items')
     } finally {
       setLoading(false)
     }
   }
 
-  const removeItem = async (item) => {
+  const removeItem = (item) => {
     if (!selectedMappingId) return
+    setConfirmRemoveItem(item)
+  }
 
-    const ok = window.confirm(`Remove ticket ${item.ticket_number || item.transaction_id}?`)
-    if (!ok) return
+  const confirmRemoveMappingItem = async () => {
+    if (!confirmRemoveItem || !selectedMappingId) return
+    const item = confirmRemoveItem
 
     try {
       setLoading(true)
       const updated = await removeMovementMappingItem(selectedMappingId, item.id)
       setSelectedMapping(updated)
+      setConfirmRemoveItem(null)
       await loadList()
     } catch (e) {
-      alert(e.message || 'Unable to remove item')
+      setErrorMsg(e.message || 'Unable to remove item')
+      setConfirmRemoveItem(null)
     } finally {
       setLoading(false)
     }
   }
 
-  const closeMap = async () => {
+  const closeMap = () => {
     if (!selectedMappingId) return
+    setConfirmCloseMap(true)
+  }
 
-    const ok = window.confirm('Close this mapping? After closing, it becomes read-only.')
-    if (!ok) return
+  const confirmCloseMapping = async () => {
+    if (!selectedMappingId) return
 
     try {
       setLoading(true)
       const updated = await closeMovementMapping(selectedMappingId)
       setSelectedMapping(updated)
+      setConfirmCloseMap(false)
       await loadList()
+      setSuccessMsg('Mapping closed.')
     } catch (e) {
-      alert(e.message || 'Unable to close mapping')
+      setErrorMsg(e.message || 'Unable to close mapping')
+      setConfirmCloseMap(false)
     } finally {
       setLoading(false)
     }
@@ -316,6 +332,38 @@ function MovementMapping({ locations = [] }) {
 
   return (
     <div>
+      {successMsg && (
+        <div className="success-box" onClick={() => setSuccessMsg('')}>
+          {successMsg}
+        </div>
+      )}
+      {errorMsg && (
+        <div className="error-box" onClick={() => setErrorMsg('')}>
+          {errorMsg}
+        </div>
+      )}
+      {confirmRemoveItem && (
+        <div className="confirm-overlay">
+          <div className="confirm-dialog">
+            <p>Remove ticket {confirmRemoveItem.ticket_number || confirmRemoveItem.transaction_id}?</p>
+            <div className="confirm-actions">
+              <button onClick={confirmRemoveMappingItem}>Yes, Remove</button>
+              <button onClick={() => setConfirmRemoveItem(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {confirmCloseMap && (
+        <div className="confirm-overlay">
+          <div className="confirm-dialog">
+            <p>Close this mapping? After closing, it becomes read-only.</p>
+            <div className="confirm-actions">
+              <button onClick={confirmCloseMapping}>Yes, Close</button>
+              <button onClick={() => setConfirmCloseMap(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="page-title">
         <div>
           <h2>Movement Mapping</h2>
@@ -579,7 +627,7 @@ function MovementMapping({ locations = [] }) {
                 <div className="operation-entry-subgrid" style={{ marginTop: 10 }}>
                   <div>
                     <label>Convoy Number</label>
-                    <input value={convoyNumber} onChange={(e) => setConvoyNumber(e.target.value)} />
+                    <input value={convoyNumber} onChange={(e) => { setConvoyNumber(e.target.value); setErrorMsg(''); }} />
                   </div>
                   <div className="report-filter-actions">
                     <button type="button" onClick={loadBargeUnloads} disabled={loading || selectedMapping.status === 'CLOSED'}>
@@ -658,7 +706,7 @@ function MovementMapping({ locations = [] }) {
                     <label>Location</label>
                     <input
                       value={txSearch.locationCode}
-                      onChange={(e) => setTxSearch((c) => ({ ...c, locationCode: e.target.value }))}
+                      onChange={(e) => { setTxSearch((c) => ({ ...c, locationCode: e.target.value })); if (errorMsg) setErrorMsg(''); }}
                       placeholder="UTP"
                     />
                   </div>

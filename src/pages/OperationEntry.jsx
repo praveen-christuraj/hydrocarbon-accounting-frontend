@@ -651,6 +651,9 @@ function OperationEntry({
 
   const [editId, setEditId] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [successMsg, setSuccessMsg] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
+  const [confirmAction, setConfirmAction] = useState(null)
   const [tankerSenderReference, setTankerSenderReference] = useState(null)
   const [tankerSenderReferenceLoading, setTankerSenderReferenceLoading] =
     useState(false)
@@ -790,7 +793,7 @@ function OperationEntry({
       } catch (error) {
         if (!isCancelled) {
           setTankerSenderReference(null)
-          alert(error.message || 'Unable to load sender tanker reference')
+          setErrorMsg(error.message || 'Unable to load sender tanker reference')
         }
       } finally {
         if (!isCancelled) {
@@ -1193,17 +1196,17 @@ function OperationEntry({
     e.preventDefault()
 
     if (entry.operationTypeCode.trim() === '') {
-      alert('Operation Type is required')
+      setErrorMsg('Operation Type is required')
       return
     }
 
     if (String(entry.operationTemplateId).trim() === '') {
-      alert('Operation Template is required')
+      setErrorMsg('Operation Template is required')
       return
     }
 
     if (entry.primaryAssetCode.trim() === '') {
-      alert('Primary Asset is required')
+      setErrorMsg('Primary Asset is required')
       return
     }
     const selectedLayoutType = String(selectedTemplate?.entryLayoutType || '')
@@ -1214,21 +1217,21 @@ function OperationEntry({
     const isShuttleTracking = selectedLayoutType.includes('shuttle tracking')
 
     if ((isMultiTank || isTanker) && entry.convoyNumber.trim() === '') {
-      alert('Convoy Number is required for Multi-Tank / Tanker operations')
+      setErrorMsg('Convoy Number is required for Multi-Tank / Tanker operations')
       return
     }
 
     if (isShuttleTracking && entry.convoyNumber.trim() === '') {
-      alert('Shuttle Number is required for Shuttle Tracking')
+      setErrorMsg('Shuttle Number is required for Shuttle Tracking')
       return
     }
     if (entry.originLocationCode.trim() === '') {
-      alert('Origin Location is required')
+      setErrorMsg('Origin Location is required')
       return
     }
 
     if (entry.operationDate.trim() === '') {
-      alert('Operation Date is required')
+      setErrorMsg('Operation Date is required')
       return
     }
 
@@ -1236,7 +1239,7 @@ function OperationEntry({
       selectedOperationType?.requiresSenderLocation === 'Yes' &&
       entry.senderLocationCode.trim() === ''
     ) {
-      alert('Sender Location is required for this operation type')
+      setErrorMsg('Sender Location is required for this operation type')
       return
     }
 
@@ -1244,7 +1247,7 @@ function OperationEntry({
       selectedOperationType?.requiresReceiverLocation === 'Yes' &&
       entry.receiverLocationCode.trim() === ''
     ) {
-      alert('Receiver Location is required for this operation type')
+      setErrorMsg('Receiver Location is required for this operation type')
       return
     }
 
@@ -1258,7 +1261,7 @@ function OperationEntry({
         templateField?.inputMode === 'Manual' &&
         String(value.fieldValue ?? '').trim() === ''
       ) {
-        alert(`${value.fieldName} is required`)
+        setErrorMsg(`${value.fieldName} is required`)
         return
       }
     }
@@ -1268,7 +1271,7 @@ function OperationEntry({
     if (layoutType === 'Tank Gauging') {
       const hasTankPayload = (entry.values || []).some((v) => v.fieldCode === 'tank_gauging_payload')
       if (!hasTankPayload) {
-        alert('Template setup required: Add System field "tank_gauging_payload" in Operation Template.')
+        setErrorMsg('Template setup required: Add System field "tank_gauging_payload" in Operation Template.')
         return
       }
     }
@@ -1276,7 +1279,7 @@ function OperationEntry({
     if (layoutType === 'Multi-Tank Before/After') {
       const hasMultiTankPayload = (entry.values || []).some((v) => v.fieldCode === 'multi_tank_payload')
       if (!hasMultiTankPayload) {
-        alert('Template setup required: Add System field "multi_tank_payload" in Operation Template.')
+        setErrorMsg('Template setup required: Add System field "multi_tank_payload" in Operation Template.')
         return
       }
     }
@@ -1284,7 +1287,7 @@ function OperationEntry({
     if (layoutType === 'Tanker Loading') {
       const hasTankerPayload = (entry.values || []).some((v) => v.fieldCode === 'tanker_payload')
       if (!hasTankerPayload) {
-        alert('Template setup required: Add System field "tanker_payload" in Operation Template.')
+        setErrorMsg('Template setup required: Add System field "tanker_payload" in Operation Template.')
         return
       }
     }
@@ -1292,7 +1295,7 @@ function OperationEntry({
     if (layoutType === 'Meter Reading') {
       const hasFlowmeterPayload = (entry.values || []).some((v) => v.fieldCode === 'flowmeter_payload')
       if (!hasFlowmeterPayload) {
-        alert('Template setup required: Add System field "flowmeter_payload" in Operation Template.')
+        setErrorMsg('Template setup required: Add System field "flowmeter_payload" in Operation Template.')
         return
       }
 
@@ -1318,12 +1321,12 @@ function OperationEntry({
       const observedDensity = Number(inputs.observed_density ?? NaN)
 
       if (!inputs.reading_date) {
-        alert('Flowmeter Date is required.')
+        setErrorMsg('Flowmeter Date is required.')
         return
       }
       if (meters.length > 0) {
         if (!inputs.stream_name) {
-          alert('Flowmeter Stream is required.')
+          setErrorMsg('Flowmeter Stream is required.')
           return
         }
         for (const meter of meters) {
@@ -1331,46 +1334,46 @@ function OperationEntry({
           const closing = Number(meter.closing_reading ?? NaN)
           const label = String(meter.meter_label || 'Meter')
           if (!Number.isFinite(opening) || opening < 0) {
-            alert(`${label}: Opening Reading cannot be negative.`)
+            setErrorMsg(`${label}: Opening Reading cannot be negative.`)
             return
           }
           if (!Number.isFinite(closing) || closing < 0) {
-            alert(`${label}: Closing Reading cannot be negative.`)
+            setErrorMsg(`${label}: Closing Reading cannot be negative.`)
             return
           }
           if (closing < opening) {
-            alert(`${label}: Closing Reading cannot be less than Opening Reading.`)
+            setErrorMsg(`${label}: Closing Reading cannot be less than Opening Reading.`)
             return
           }
         }
       } else if (!inputs.meter_label) {
-        alert('Flowmeter Meter Label is required.')
+        setErrorMsg('Flowmeter Meter Label is required.')
         return
       }
       if (!Number.isFinite(tankTemp)) {
-        alert('Tank Temperature is required.')
+        setErrorMsg('Tank Temperature is required.')
         return
       }
       if (!Number.isFinite(sampleTemp)) {
-        alert('Sample Temperature is required.')
+        setErrorMsg('Sample Temperature is required.')
         return
       }
       if (!Number.isFinite(bsw) || bsw < 0 || bsw > 100) {
-        alert('BS & W must be between 0 and 100.')
+        setErrorMsg('BS & W must be between 0 and 100.')
         return
       }
       if (observedType === 'Observed API') {
         if (!Number.isFinite(observedApi)) {
-          alert('Observed API is required.')
+          setErrorMsg('Observed API is required.')
           return
         }
       } else if (observedType === 'Observed Density') {
         if (!Number.isFinite(observedDensity)) {
-          alert('Observed Density is required.')
+          setErrorMsg('Observed Density is required.')
           return
         }
       } else {
-        alert('Observed Input Type is required.')
+        setErrorMsg('Observed Input Type is required.')
         return
       }
     }
@@ -1378,27 +1381,27 @@ function OperationEntry({
     if (layoutType === 'Shuttle Tracking') {
       const hasShuttlePayload = (entry.values || []).some((v) => v.fieldCode === 'shuttle_payload')
       if (!hasShuttlePayload) {
-        alert('Template setup required: Add System field "shuttle_payload" in Operation Template.')
+        setErrorMsg('Template setup required: Add System field "shuttle_payload" in Operation Template.')
         return
       }
     }
 
     const mandatoryError = validateAssetSpecificMandatory(entry.values || [])
     if (mandatoryError) {
-      alert(mandatoryError)
+      setErrorMsg(mandatoryError)
       return
     }
 
     const actionLabel = editId === null ? 'save' : 'update'
-    const ok = window.confirm(
-      `Confirm to ${actionLabel} this Draft ticket?\n\n` +
-      `Operation Type: ${entry.operationTypeCode}\n` +
-      `Template ID: ${entry.operationTemplateId}\n` +
-      `Asset: ${entry.primaryAssetCode}\n` +
-      `Date: ${entry.operationDate}`
-    )
+    setConfirmAction({
+      type: 'submit',
+      actionLabel,
+      message: `Confirm to ${actionLabel} this Draft ticket?\n\nOperation Type: ${entry.operationTypeCode}\nTemplate ID: ${entry.operationTemplateId}\nAsset: ${entry.primaryAssetCode}\nDate: ${entry.operationDate}`,
+    })
+  }
 
-    if (!ok) return
+  const confirmSubmitAction = async () => {
+    setConfirmAction(null)
     try {
       setLoading(true)
 
@@ -1406,13 +1409,13 @@ function OperationEntry({
 
       if (editId === null) {
         saved = await createOperationEntry({ ...entry, status: 'Draft' })
-        alert('Operation Entry saved successfully')
+        setSuccessMsg('Operation Entry saved successfully')
       } else {
         saved = await updateOperationEntry(editId, {
           ...entry,
           status: entry.status || 'Draft',
         })
-        alert('Operation Entry updated successfully')
+        setSuccessMsg('Operation Entry updated successfully')
       }
 
       await reloadOperationEntries()
@@ -1424,7 +1427,7 @@ function OperationEntry({
       if (saved && prefill.autoEventType) {
         const convoy = String(entry.convoyNumber || '').trim()
         if (!convoy) {
-          alert(`Auto navigation skipped: Convoy Number is required for ${prefill.autoEventType}`)
+          setErrorMsg(`Auto navigation skipped: Convoy Number is required for ${prefill.autoEventType}`)
           setLoading(false)
           return
         }
@@ -1436,7 +1439,7 @@ function OperationEntry({
       setEntry(emptyEntry)
       setEditId(null)
     } catch (error) {
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       setLoading(false)
     }
@@ -1444,13 +1447,16 @@ function OperationEntry({
 
   const handleEdit = (entryToEdit) => {
     if (entryToEdit.status !== 'Draft' && entryToEdit.status !== 'Rejected') {
-      alert('Only Draft or Rejected operation entries can be edited.')
+      setErrorMsg('Only Draft or Rejected operation entries can be edited.')
       return
     }
-    const ok = window.confirm(
-      'Open this ticket for editing?\n\nAny current form changes will be replaced.'
-    )
-    if (!ok) return
+    setConfirmAction({ type: 'edit', data: entryToEdit, message: 'Open this ticket for editing?\n\nAny current form changes will be replaced.' })
+  }
+
+  const confirmEditAction = () => {
+    if (!confirmAction?.data) return
+    const entryToEdit = confirmAction.data
+    setConfirmAction(null)
 
     setEntry({
       operationTypeCode: entryToEdit.operationTypeCode,
@@ -1487,24 +1493,24 @@ function OperationEntry({
   }
 
   const handleCloseEdit = () => {
-    const ok = window.confirm(
-      'Close editing window?\n\nAny unsaved changes will be lost.'
-    )
-    if (!ok) return
+    setConfirmAction({ type: 'closeEdit', message: 'Close editing window?\n\nAny unsaved changes will be lost.' })
+  }
 
+  const confirmCloseEditAction = () => {
+    setConfirmAction(null)
     setEntry(emptyEntry)
     setEditId(null)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const handleDelete = async (entryId) => {
-    const confirmDelete = window.confirm(
-      'Are you sure you want to cancel this Draft/Rejected operation entry? This will preserve the audit history.'
-    )
+    setConfirmAction({ type: 'delete', data: entryId, message: 'Are you sure you want to cancel this Draft/Rejected operation entry? This will preserve the audit history.' })
+  }
 
-    if (confirmDelete === false) {
-      return
-    }
+  const confirmDeleteAction = async () => {
+    const entryId = confirmAction?.data
+    setConfirmAction(null)
+    if (!entryId) return
 
     try {
       setLoading(true)
@@ -1521,18 +1527,20 @@ function OperationEntry({
         setEditId(null)
       }
 
-      alert('Operation Entry cancelled successfully')
+      setSuccessMsg('Operation Entry cancelled successfully')
     } catch (error) {
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       setLoading(false)
     }
   }
 
   const handleCancelEdit = () => {
-    const ok = window.confirm('Cancel editing and clear the current form?')
-    if (!ok) return
+    setConfirmAction({ type: 'cancelEdit', message: 'Cancel editing and clear the current form?' })
+  }
 
+  const confirmCancelEditAction = () => {
+    setConfirmAction(null)
     setEntry(emptyEntry)
     setEditId(null)
   }
@@ -1554,6 +1562,33 @@ function OperationEntry({
 
   return (
     <div>
+      {successMsg && (
+        <div className="success-box" onClick={() => setSuccessMsg('')}>
+          {successMsg}
+        </div>
+      )}
+      {errorMsg && (
+        <div className="error-box" onClick={() => setErrorMsg('')}>
+          {errorMsg}
+        </div>
+      )}
+      {confirmAction && (
+        <div className="confirm-overlay">
+          <div className="confirm-dialog">
+            <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{confirmAction.message}</pre>
+            <div className="confirm-actions">
+              <button onClick={
+                confirmAction.type === 'submit' ? confirmSubmitAction :
+                confirmAction.type === 'edit' ? confirmEditAction :
+                confirmAction.type === 'closeEdit' ? confirmCloseEditAction :
+                confirmAction.type === 'delete' ? confirmDeleteAction :
+                confirmCancelEditAction
+              }>Yes</button>
+              <button onClick={() => setConfirmAction(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="page-title">
         <div>
           <h2>Operation Entry</h2>

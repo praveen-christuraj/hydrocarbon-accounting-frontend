@@ -1600,6 +1600,8 @@ function OperationTransactionDetail({ loggedInUser }) {
   )
   const [reportSettings, setReportSettings] = useState(defaultReportSettings)
   const [reportProfilesLoading, setReportProfilesLoading] = useState(false)
+  const [successMsg, setSuccessMsg] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
   const reloadReportProfiles = async (preferredProfileName = '') => {
     try {
       setReportProfilesLoading(true)
@@ -1630,7 +1632,7 @@ function OperationTransactionDetail({ loggedInUser }) {
 
       return activeProfiles
     } catch (error) {
-      alert(error.message)
+      setErrorMsg(error.message)
       setReportProfiles([])
       setSelectedReportProfileName(defaultReportSettings.profileName)
       setReportSettings(defaultReportSettings)
@@ -1654,14 +1656,15 @@ function OperationTransactionDetail({ loggedInUser }) {
     setSelectedReportProfileName(profileName)
     setReportSettings(selectedProfile)
   }
-  const hasPermission = (permissionName) => {
-    if (!loggedInUser || !loggedInUser.permissions) {
-      return false
-    }
+  const isAdminBootstrap =
+    String(loggedInUser?.username || '').toLowerCase() === 'admin'
 
-    return loggedInUser.permissions.some((permission) => {
-      return permission.permissionName === permissionName
-    })
+  const hasPermission = (permissionName) => {
+    if (isAdminBootstrap) return true
+    if (!loggedInUser || !Array.isArray(loggedInUser.permissions)) return false
+    return loggedInUser.permissions.some(
+      (p) => p.permissionName === permissionName
+    )
   }
 
   const canViewTransaction = hasPermission('View Operation Transaction')
@@ -1712,7 +1715,7 @@ function OperationTransactionDetail({ loggedInUser }) {
       const data = await getOperationTransactionDetail(transactionId)
       setTransaction(data)
     } catch (error) {
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       setLoading(false)
     }
@@ -1723,7 +1726,7 @@ function OperationTransactionDetail({ loggedInUser }) {
       const data = await getOperationTransactionStatusHistory(transactionId)
       setStatusHistory(data)
     } catch (error) {
-      alert(error.message)
+      setErrorMsg(error.message)
     }
   }
 
@@ -1780,7 +1783,7 @@ function OperationTransactionDetail({ loggedInUser }) {
 
   const openReviewModal = (nextStatus) => {
     if (!loggedInUser) {
-      alert('Please login before changing status.')
+      setErrorMsg('Please login before changing status.')
       return
     }
 
@@ -1788,22 +1791,22 @@ function OperationTransactionDetail({ loggedInUser }) {
       (nextStatus === 'Submitted' || nextStatus === 'Draft') &&
       !((nextStatus === 'Draft' ? canRecallTransaction : canSubmitTransaction))
     ) {
-      alert('You do not have permission to submit or recall operation transactions.')
+      setErrorMsg('You do not have permission to submit or recall operation transactions.')
       return
     }
 
     if (nextStatus === 'Approved' && !canApproveTransaction) {
-      alert('You do not have permission to approve operation transactions.')
+      setErrorMsg('You do not have permission to approve operation transactions.')
       return
     }
 
     if (nextStatus === 'Rejected' && !canRejectTransaction) {
-      alert('You do not have permission to reject operation transactions.')
+      setErrorMsg('You do not have permission to reject operation transactions.')
       return
     }
 
     if (nextStatus === 'Cancelled' && !canCancelTransaction) {
-      alert('You do not have permission to cancel operation transactions.')
+      setErrorMsg('You do not have permission to cancel operation transactions.')
       return
     }
 
@@ -1839,7 +1842,7 @@ function OperationTransactionDetail({ loggedInUser }) {
 
   const handleExportTankGaugingCsv = () => {
     if (!transaction || !tankPayload) {
-      alert('No Tank Gauging data available to export.')
+      setErrorMsg('No Tank Gauging data available to export.')
       return
     }
 
@@ -1998,7 +2001,7 @@ function OperationTransactionDetail({ loggedInUser }) {
       })
 
     if (pendingStatus === 'Approved' && isTankerTicket && !hasTankerPayload) {
-      alert(
+      setErrorMsg(
         'Cannot approve this tanker ticket because tanker_payload is missing. Please return it to Draft and complete the tanker entry.'
       )
       return
@@ -2010,7 +2013,7 @@ function OperationTransactionDetail({ loggedInUser }) {
       pendingStatus === 'Draft'
 
     if (reasonRequired && pendingRemarks.trim() === '') {
-      alert('Reason / remarks is required for this action.')
+      setErrorMsg('Reason / remarks is required for this action.')
       return
     }
 
@@ -2027,10 +2030,10 @@ function OperationTransactionDetail({ loggedInUser }) {
       await loadTransactionDetail()
       await loadStatusHistory()
 
-      alert(`Transaction status changed to ${pendingStatus}`)
+      setSuccessMsg(`Transaction status changed to ${pendingStatus}`)
       closeReviewModal()
     } catch (error) {
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       setStatusLoading(false)
     }
@@ -2060,26 +2063,27 @@ function OperationTransactionDetail({ loggedInUser }) {
       ...current,
       [fieldName]: value,
     }))
+    if (errorMsg) setErrorMsg('')
   }
 
   const submitCorrectionRequest = async () => {
     if (!transaction || transaction.status !== 'Approved') {
-      alert('Only approved tickets can be marked for correction.')
+      setErrorMsg('Only approved tickets can be marked for correction.')
       return
     }
 
     if (!canRequestApprovedCorrection) {
-      alert('You need approval access to request approved transaction correction.')
+      setErrorMsg('You need approval access to request approved transaction correction.')
       return
     }
 
     if (approvedCorrectionExpired) {
-      alert('Approved transaction correction window expired after 24 hours.')
+      setErrorMsg('Approved transaction correction window expired after 24 hours.')
       return
     }
 
     if (correctionForm.reason.trim() === '') {
-      alert('Reason / justification is required.')
+      setErrorMsg('Reason / justification is required.')
       return
     }
 
@@ -2093,9 +2097,9 @@ function OperationTransactionDetail({ loggedInUser }) {
         suggestedAction: 'Reopen for Edit',
         reason: '',
       })
-      alert('Approved transaction correction request sent to admin.')
+      setSuccessMsg('Approved transaction correction request sent to admin.')
     } catch (error) {
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       setCorrectionLoading(false)
     }
@@ -2343,6 +2347,16 @@ function OperationTransactionDetail({ loggedInUser }) {
 
   return (
     <div>
+      {successMsg && (
+        <div className="success-box" onClick={() => setSuccessMsg('')}>
+          {successMsg}
+        </div>
+      )}
+      {errorMsg && (
+        <div className="error-box" onClick={() => setErrorMsg('')}>
+          {errorMsg}
+        </div>
+      )}
       <PrintableTankGaugingReport
         transaction={transaction}
         tankPayload={tankPayload}

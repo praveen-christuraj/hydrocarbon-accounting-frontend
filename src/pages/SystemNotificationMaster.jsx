@@ -34,7 +34,7 @@ const toLocalDateTimeInput = (value) => {
   return date.toISOString().slice(0, 16)
 }
 
-function SystemNotificationMaster({ roles = [], users = [], locations = [] }) {
+function SystemNotificationMaster({ roles = [], users = [], locations = [], loggedInUser }) {
   const [form, setForm] = useState(emptyForm)
   const [editId, setEditId] = useState(null)
   const [notifications, setNotifications] = useState([])
@@ -42,6 +42,12 @@ function SystemNotificationMaster({ roles = [], users = [], locations = [] }) {
   const [selectedNotification, setSelectedNotification] = useState(null)
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [loading, setLoading] = useState(false)
+  const [successMsg, setSuccessMsg] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
+  const [validationErrors, setValidationErrors] = useState({})
+  const [confirmPublishItem, setConfirmPublishItem] = useState(null)
+  const [deactivateItem, setDeactivateItem] = useState(null)
+  const [deactivateReason, setDeactivateReason] = useState('')
 
   const activeRoles = useMemo(() => roles.filter((role) => role.status === 'Active'), [roles])
   const activeUsers = useMemo(() => users.filter((user) => user.status === 'Active'), [users])
@@ -49,6 +55,20 @@ function SystemNotificationMaster({ roles = [], users = [], locations = [] }) {
     () => locations.filter((location) => location.status === 'Active'),
     [locations]
   )
+
+  const isAdminBootstrap =
+    String(loggedInUser?.username || '').toLowerCase() === 'admin'
+  const hasPermission = (permissionName) => {
+    if (isAdminBootstrap) return true
+    if (!loggedInUser || !Array.isArray(loggedInUser.permissions)) return false
+    return loggedInUser.permissions.some(
+      (p) => p.permissionName === permissionName
+    )
+  }
+  const canManageSystemNotification = hasPermission('Manage System Notification')
+  const canPublishSystemNotification = hasPermission('Publish System Notification')
+  const canDeactivateSystemNotification = hasPermission('Deactivate System Notification')
+  const canViewDeliveryReport = hasPermission('View System Notification Delivery Report')
 
   const loadNotifications = async (status = statusFilter) => {
     try {
@@ -58,7 +78,7 @@ function SystemNotificationMaster({ roles = [], users = [], locations = [] }) {
       })
       setNotifications(data)
     } catch (error) {
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       setLoading(false)
     }
@@ -92,47 +112,59 @@ function SystemNotificationMaster({ roles = [], users = [], locations = [] }) {
     setEditId(null)
   }
 
-  const validateForm = () => {
-    if (form.title.trim() === '') {
-      alert('Title is required')
-      return false
-    }
-    if (form.message.trim() === '') {
-      alert('Message is required')
-      return false
-    }
-    if (form.displayFrom && form.displayUntil && form.displayFrom > form.displayUntil) {
-      alert('Display From cannot be later than Display Until')
-      return false
-    }
-    return true
-  }
-
   const handleSave = async (event) => {
     event.preventDefault()
-    if (!validateForm()) return
+
+    if (!canManageSystemNotification) {
+      setErrorMsg('You do not have permission to manage system notifications.')
+      return
+    }
+
+    setSuccessMsg('')
+    setErrorMsg('')
+    setValidationErrors({})
+
+    const errors = {}
+    if (form.title.trim() === '') {
+      errors.title = 'Title is required'
+    }
+    if (form.message.trim() === '') {
+      errors.message = 'Message is required'
+    }
+    if (form.displayFrom && form.displayUntil && form.displayFrom > form.displayUntil) {
+      errors.displayUntil = 'Display From cannot be later than Display Until'
+    }
+
+    setValidationErrors(errors)
+    if (Object.keys(errors).length > 0) return
 
     try {
       setLoading(true)
       if (editId) {
         await updateSystemNotification(editId, form)
-        alert('Notification updated')
+        setSuccessMsg('Notification updated')
       } else {
         await createSystemNotification(form)
-        alert('Notification created')
+        setSuccessMsg('Notification created')
       }
       resetForm()
       await loadNotifications()
     } catch (error) {
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       setLoading(false)
     }
   }
 
   const handleEdit = (notification) => {
+    setSuccessMsg('')
+    setErrorMsg('')
+    if (!canManageSystemNotification) {
+      setErrorMsg('You do not have permission to manage system notifications.')
+      return
+    }
     if (notification.status === 'Published') {
-      alert('Published notifications cannot be edited. Deactivate and create a new circular if needed.')
+      setErrorMsg('Published notifications cannot be edited. Deactivate and create a new circular if needed.')
       return
     }
     setEditId(notification.id)
@@ -156,30 +188,43 @@ function SystemNotificationMaster({ roles = [], users = [], locations = [] }) {
     })
   }
 
-  const handlePublish = async (notification) => {
-    if (!window.confirm(`Publish ${notification.notificationNumber}?`)) return
+  const handlePublish = async () => {
+    setSuccessMsg('')
+    setErrorMsg('')
+    if (!canPublishSystemNotification) {
+      setErrorMsg('You do not have permission to publish system notifications.')
+      return
+    }
     try {
       setLoading(true)
-      await publishSystemNotification(notification.id, 'Published from System Notification Manager')
+      await publishSystemNotification(confirmPublishItem.id, 'Published from System Notification Manager')
+      setConfirmPublishItem(null)
       await loadNotifications()
-      alert('Notification published')
+      setSuccessMsg('Notification published')
     } catch (error) {
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       setLoading(false)
     }
   }
 
-  const handleDeactivate = async (notification) => {
-    const reason = window.prompt('Deactivation reason', 'Notification deactivated by admin')
-    if (reason === null) return
+  const handleDeactivate = async () => {
+    setSuccessMsg('')
+    setErrorMsg('')
+    if (!canDeactivateSystemNotification) {
+      setErrorMsg('You do not have permission to deactivate system notifications.')
+      return
+    }
+    const reason = deactivateReason || 'Notification deactivated by admin'
     try {
       setLoading(true)
-      await deactivateSystemNotification(notification.id, reason)
+      await deactivateSystemNotification(deactivateItem.id, reason)
+      setDeactivateItem(null)
+      setDeactivateReason('')
       await loadNotifications()
-      alert('Notification deactivated')
+      setSuccessMsg('Notification deactivated')
     } catch (error) {
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       setLoading(false)
     }
@@ -191,7 +236,7 @@ function SystemNotificationMaster({ roles = [], users = [], locations = [] }) {
       const data = await getSystemNotificationDeliveryReport(notification.id)
       setDeliveryRows(data || [])
     } catch (error) {
-      alert(error.message)
+      setErrorMsg(error.message)
     }
   }
 
@@ -209,15 +254,74 @@ function SystemNotificationMaster({ roles = [], users = [], locations = [] }) {
         <span className="record-count">{notifications.length} Notifications</span>
       </div>
 
+      {successMsg && (
+        <div className="success-box">{successMsg}</div>
+      )}
+
+      {errorMsg && (
+        <div className="error-box">{errorMsg}</div>
+      )}
+
+      {confirmPublishItem && (
+        <div className="confirm-overlay">
+          <div className="confirm-box">
+            <p>Publish <strong>{confirmPublishItem.notificationNumber}</strong>?</p>
+            <div className="confirm-actions">
+              <button onClick={handlePublish} disabled={loading}>
+                {loading ? 'Publishing...' : 'Yes, Publish'}
+              </button>
+              <button onClick={() => setConfirmPublishItem(null)} disabled={loading}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deactivateItem && (
+        <div className="confirm-overlay">
+          <div className="confirm-box">
+            <p>Deactivate <strong>{deactivateItem.notificationNumber}</strong></p>
+            <label>Deactivation reason</label>
+            <input
+              type="text"
+              value={deactivateReason}
+              onChange={(e) => setDeactivateReason(e.target.value)}
+              placeholder="Notification deactivated by admin"
+            />
+            <div className="confirm-actions">
+              <button onClick={handleDeactivate} disabled={loading}>
+                {loading ? 'Deactivating...' : 'Deactivate'}
+              </button>
+              <button onClick={() => { setDeactivateItem(null); setDeactivateReason('') }} disabled={loading}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!canManageSystemNotification && (
+        <div className="info-box">
+          You have view-only access. Contact an administrator to create, edit, or
+          manage system notifications.
+        </div>
+      )}
+
+      {canManageSystemNotification && (
       <form onSubmit={handleSave} className="notification-admin-form">
         <div>
           <label>Title</label>
           <input
             value={form.title}
-            onChange={(event) => updateField('title', event.target.value)}
+            onChange={(event) => { updateField('title', event.target.value); setValidationErrors({ ...validationErrors, title: '' }) }}
             placeholder="Server maintenance scheduled"
             disabled={loading}
+            className={validationErrors.title ? 'input-error' : ''}
           />
+          {validationErrors.title && (
+            <span className="field-error">{validationErrors.title}</span>
+          )}
         </div>
 
         <div className="full-width-field">
@@ -225,10 +329,14 @@ function SystemNotificationMaster({ roles = [], users = [], locations = [] }) {
           <textarea
             rows="4"
             value={form.message}
-            onChange={(event) => updateField('message', event.target.value)}
+            onChange={(event) => { updateField('message', event.target.value); setValidationErrors({ ...validationErrors, message: '' }) }}
             placeholder="Write the notification users should see."
             disabled={loading}
+            className={validationErrors.message ? 'input-error' : ''}
           />
+          {validationErrors.message && (
+            <span className="field-error">{validationErrors.message}</span>
+          )}
         </div>
 
         <div>
@@ -282,7 +390,10 @@ function SystemNotificationMaster({ roles = [], users = [], locations = [] }) {
 
         <div>
           <label>Display Until</label>
-          <input type="datetime-local" value={form.displayUntil} onChange={(event) => updateField('displayUntil', event.target.value)} />
+          <input type="datetime-local" value={form.displayUntil} onChange={(event) => { updateField('displayUntil', event.target.value); setValidationErrors({ ...validationErrors, displayUntil: '' }) }} className={validationErrors.displayUntil ? 'input-error' : ''} />
+          {validationErrors.displayUntil && (
+            <span className="field-error">{validationErrors.displayUntil}</span>
+          )}
         </div>
 
         <label className="checkbox-label">
@@ -383,6 +494,7 @@ function SystemNotificationMaster({ roles = [], users = [], locations = [] }) {
           </button>
         </div>
       </form>
+      )}
 
       <div className="section-title">
         <h3>Notifications</h3>
@@ -451,18 +563,26 @@ function SystemNotificationMaster({ roles = [], users = [], locations = [] }) {
                 </td>
                 <td>
                   <div className="table-actions">
-                    <button type="button" onClick={() => handleEdit(notification)} disabled={loading || notification.status === 'Published'}>
-                      Edit
-                    </button>
-                    <button type="button" onClick={() => handlePublish(notification)} disabled={loading || ['Published', 'Deactivated'].includes(notification.status)}>
-                      Publish
-                    </button>
-                    <button type="button" onClick={() => handleDeactivate(notification)} disabled={loading || notification.status === 'Deactivated'}>
-                      Deactivate
-                    </button>
-                    <button type="button" onClick={() => loadDeliveryReport(notification)} disabled={loading}>
-                      Delivery
-                    </button>
+                    {canManageSystemNotification && (
+                      <button type="button" onClick={() => handleEdit(notification)} disabled={loading || notification.status === 'Published'}>
+                        Edit
+                      </button>
+                    )}
+                    {canPublishSystemNotification && (
+                      <button type="button" onClick={() => { setSuccessMsg(''); setErrorMsg(''); setConfirmPublishItem(notification) }} disabled={loading || ['Published', 'Deactivated'].includes(notification.status)}>
+                        Publish
+                      </button>
+                    )}
+                    {canDeactivateSystemNotification && (
+                      <button type="button" onClick={() => { setSuccessMsg(''); setErrorMsg(''); setDeactivateItem(notification); setDeactivateReason('Notification deactivated by admin') }} disabled={loading || notification.status === 'Deactivated'}>
+                        Deactivate
+                      </button>
+                    )}
+                    {canViewDeliveryReport && (
+                      <button type="button" onClick={() => loadDeliveryReport(notification)} disabled={loading}>
+                        Delivery
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>

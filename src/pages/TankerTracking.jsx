@@ -130,6 +130,10 @@ function TankerTracking({
   const [loading, setLoading] = useState(false)
   const [closeGroup, setCloseGroup] = useState(null)
   const [closureRemarks, setClosureRemarks] = useState('')
+  const [successMsg, setSuccessMsg] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
+  const [confirmRevokeGroup, setConfirmRevokeGroup] = useState(null)
+  const [confirmCloseGroup, setConfirmCloseGroup] = useState(null)
   
   const trackingExceptionSummary = useMemo(() => {
     const rows = report.rows || []
@@ -253,7 +257,7 @@ function TankerTracking({
         setSelectedGroup(refreshedSelectedGroup || null)
       }
     } catch (error) {
-      alert(error.message || 'Unable to load Tanker Tracking')
+      setErrorMsg(error.message || 'Unable to load Tanker Tracking')
     } finally {
       setLoading(false)
     }
@@ -279,7 +283,7 @@ function TankerTracking({
 
   const openAcknowledgePanel = (row) => {
     if (!row.senderTicket?.transactionId) {
-      alert('Sender ticket is missing. Cannot acknowledge this tanker.')
+      setErrorMsg('Sender ticket is missing. Cannot acknowledge this tanker.')
       return
     }
 
@@ -312,12 +316,12 @@ function TankerTracking({
 
   const handleAcknowledge = async () => {
     if (!ackGroup?.senderTicket?.transactionId) {
-      alert('Sender transaction is missing')
+      setErrorMsg('Sender transaction is missing')
       return
     }
 
     if (ackForm.receiverLocationCode.trim() === '') {
-      alert('Receiver Location is required for acknowledgement')
+      setErrorMsg('Receiver Location is required for acknowledgement')
       return
     }
 
@@ -330,12 +334,12 @@ function TankerTracking({
         remarks: ackForm.remarks,
       })
 
-      alert('Tanker receipt acknowledged successfully')
+      setSuccessMsg('Tanker receipt acknowledged successfully')
 
       closeAcknowledgePanel()
       await loadTracking()
     } catch (error) {
-      alert(error.message || 'Unable to acknowledge tanker receipt')
+      setErrorMsg(error.message || 'Unable to acknowledge tanker receipt')
     } finally {
       setLoading(false)
     }
@@ -343,7 +347,7 @@ function TankerTracking({
 
   const openRevokePanel = (row) => {
     if (!row.acknowledgementId) {
-      alert('Acknowledgement ID is missing.')
+      setErrorMsg('Acknowledgement ID is missing.')
       return
     }
 
@@ -358,32 +362,32 @@ function TankerTracking({
 
   const handleRevokeAcknowledgement = async () => {
     if (!revokeGroup?.acknowledgementId) {
-      alert('Acknowledgement ID is missing.')
+      setErrorMsg('Acknowledgement ID is missing.')
       return
     }
 
-    const confirmRevoke = window.confirm(
-      `Revoke acknowledgement for convoy ${revokeGroup.convoyNumber}?`
-    )
+    setConfirmRevokeGroup(revokeGroup)
+  }
 
-    if (!confirmRevoke) {
-      return
-    }
+  const confirmRevokeAction = async () => {
+    const group = confirmRevokeGroup
+    setConfirmRevokeGroup(null)
+    if (!group?.acknowledgementId) return
 
     try {
       setLoading(true)
 
       await revokeTankerAcknowledgement({
-        acknowledgementId: revokeGroup.acknowledgementId,
+        acknowledgementId: group.acknowledgementId,
         remarks: revokeRemarks,
       })
 
-      alert('Acknowledgement revoked successfully')
+      setSuccessMsg('Acknowledgement revoked successfully')
 
       closeRevokePanel()
       await loadTracking()
     } catch (error) {
-      alert(error.message || 'Unable to revoke acknowledgement')
+      setErrorMsg(error.message || 'Unable to revoke acknowledgement')
     } finally {
       setLoading(false)
     }
@@ -391,12 +395,12 @@ function TankerTracking({
 
   const openClosePanel = (row) => {
     if (!row.acknowledgementId) {
-      alert('Acknowledgement ID is missing. Cannot close this movement.')
+      setErrorMsg('Acknowledgement ID is missing. Cannot close this movement.')
       return
     }
 
     if (!row.latestReceiverTicket || !row.quantityComparison) {
-      alert(
+      setErrorMsg(
         'Movement can be closed only after receiver ticket is Approved and comparison is available.'
       )
       return
@@ -413,32 +417,32 @@ function TankerTracking({
 
   const handleCloseMovement = async () => {
     if (!closeGroup?.acknowledgementId) {
-      alert('Acknowledgement ID is missing.')
+      setErrorMsg('Acknowledgement ID is missing.')
       return
     }
 
-    const confirmed = window.confirm(
-      `Close tanker movement for convoy ${closeGroup.convoyNumber}?`
-    )
+    setConfirmCloseGroup(closeGroup)
+  }
 
-    if (!confirmed) {
-      return
-    }
+  const confirmCloseAction = async () => {
+    const group = confirmCloseGroup
+    setConfirmCloseGroup(null)
+    if (!group?.acknowledgementId) return
 
     try {
       setLoading(true)
 
       await closeTankerMovement({
-        acknowledgementId: closeGroup.acknowledgementId,
+        acknowledgementId: group.acknowledgementId,
         closureRemarks,
       })
 
-      alert('Tanker movement closed successfully')
+      setSuccessMsg('Tanker movement closed successfully')
 
       closeClosePanel()
       await loadTracking()
     } catch (error) {
-      alert(error.message || 'Unable to close tanker movement')
+      setErrorMsg(error.message || 'Unable to close tanker movement')
     } finally {
       setLoading(false)
     }
@@ -446,14 +450,14 @@ function TankerTracking({
 
   const handleCreateReceiverEntry = (row) => {
     if (!row.senderTicket) {
-      alert('Sender ticket is missing. Cannot create receiver entry.')
+      setErrorMsg('Sender ticket is missing. Cannot create receiver entry.')
       return
     }
 
     const receiverOperationTypeCode = getDefaultReceiverOperationTypeCode()
 
     if (!receiverOperationTypeCode) {
-      alert(
+      setErrorMsg(
         'No active Tanker Receipt/Unloading operation type found. Please create an operation type such as TANKER_RECEIPT or TANKER_UNLOADING first.'
       )
       return
@@ -464,7 +468,7 @@ function TankerTracking({
     )
 
     if (!receiverTemplateId) {
-      alert(
+      setErrorMsg(
         'No active Tanker Receiver template found for the selected receipt operation type. Please create an Operation Template with Entry Layout Type = Tanker Loading and Calculation Engine = Tanker Quantity.'
       )
       return
@@ -527,7 +531,7 @@ function TankerTracking({
 
   const openOperationTicket = (transactionId) => {
     if (!transactionId) {
-      alert('Transaction ID is missing.')
+      setErrorMsg('Transaction ID is missing.')
       return
     }
 
@@ -536,12 +540,12 @@ function TankerTracking({
 
   const handlePrintMtrReport = (row) => {
     if (!row.senderTicket) {
-      alert('Sender ticket is missing. Cannot print report.')
+      setErrorMsg('Sender ticket is missing. Cannot print report.')
       return
     }
 
     if (!row.latestReceiverTicket || !row.quantityComparison) {
-      alert(
+      setErrorMsg(
         'MTR comparison report is available only after the receiver ticket is Approved and compared.'
       )
       return
@@ -750,6 +754,38 @@ function TankerTracking({
 
   return (
     <div>
+      {successMsg && (
+        <div className="success-box" onClick={() => setSuccessMsg('')}>
+          {successMsg}
+        </div>
+      )}
+      {errorMsg && (
+        <div className="error-box" onClick={() => setErrorMsg('')}>
+          {errorMsg}
+        </div>
+      )}
+      {confirmRevokeGroup && (
+        <div className="confirm-overlay">
+          <div className="confirm-dialog">
+            <p>Revoke acknowledgement for convoy {confirmRevokeGroup.convoyNumber}?</p>
+            <div className="confirm-actions">
+              <button onClick={confirmRevokeAction}>Yes</button>
+              <button onClick={() => setConfirmRevokeGroup(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {confirmCloseGroup && (
+        <div className="confirm-overlay">
+          <div className="confirm-dialog">
+            <p>Close tanker movement for convoy {confirmCloseGroup.convoyNumber}?</p>
+            <div className="confirm-actions">
+              <button onClick={confirmCloseAction}>Yes</button>
+              <button onClick={() => setConfirmCloseGroup(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="page-title">
         <div>
           <h2>Tanker Tracking</h2>

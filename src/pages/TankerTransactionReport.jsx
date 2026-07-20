@@ -88,6 +88,8 @@ function TankerTransactionReport({ locations = [], assets = [] }) {
   const [selectedRow, setSelectedRow] = useState(null)
   const [loading, setLoading] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
+  const [successMsg, setSuccessMsg] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
 
   const activeLocations = locations.filter((item) => item.status === 'Active')
   const activeAssets = assets.filter((item) => item.status === 'Active')
@@ -118,7 +120,7 @@ function TankerTransactionReport({ locations = [], assets = [] }) {
       setCurrentPage(1)
     } catch (error) {
       console.error(error)
-      alert(error.message || 'Unable to load Tanker Transaction Report')
+      setErrorMsg(error.message || 'Unable to load Tanker Transaction Report')
     } finally {
       setLoading(false)
     }
@@ -234,6 +236,16 @@ function TankerTransactionReport({ locations = [], assets = [] }) {
 
   return (
     <div>
+      {successMsg && (
+        <div className="success-box" onClick={() => setSuccessMsg('')}>
+          {successMsg}
+        </div>
+      )}
+      {errorMsg && (
+        <div className="error-box" onClick={() => setErrorMsg('')}>
+          {errorMsg}
+        </div>
+      )}
       <div className="page-title">
         <div>
           <h2>Tanker Transaction Report</h2>

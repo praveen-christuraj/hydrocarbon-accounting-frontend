@@ -45,12 +45,16 @@ const isTankerTrailerAsset = (asset) => {
   )
 }
 
-function PrimeMoverTankerLinkMaster({ assets = [] }) {
+function PrimeMoverTankerLinkMaster({ assets = [], loggedInUser }) {
   const [links, setLinks] = useState([])
   const [link, setLink] = useState(emptyLink)
   const [editId, setEditId] = useState(null)
   const [loading, setLoading] = useState(false)
   const [filterStatus, setFilterStatus] = useState('Active')
+  const [successMsg, setSuccessMsg] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
+  const [validationErrors, setValidationErrors] = useState({})
+  const [confirmDeleteItem, setConfirmDeleteItem] = useState(null)
   const [closeForm, setCloseForm] = useState({
     linkId: null,
     linkedTo: today,
@@ -80,6 +84,8 @@ function PrimeMoverTankerLinkMaster({ assets = [] }) {
   const loadLinks = async () => {
     try {
       setLoading(true)
+      setSuccessMsg('')
+      setErrorMsg('')
 
       const filters = {}
 
@@ -90,7 +96,7 @@ function PrimeMoverTankerLinkMaster({ assets = [] }) {
       const data = await getPrimeMoverTankerLinks(filters)
       setLinks(data)
     } catch (error) {
-      alert(error.message || 'Unable to load Prime Mover - Tanker links')
+      setErrorMsg(error.message || 'Unable to load Prime Mover - Tanker links')
     } finally {
       setLoading(false)
     }
@@ -111,39 +117,40 @@ function PrimeMoverTankerLinkMaster({ assets = [] }) {
   }
 
   const validateForm = () => {
+    const errors = {}
+
     if (link.primeMoverAssetCode.trim() === '') {
-      alert('Prime Mover is required')
-      return false
+      errors.primeMoverAssetCode = 'Prime Mover is required'
     }
 
     if (link.tankerAssetCode.trim() === '') {
-      alert('Tanker Trailer is required')
-      return false
+      errors.tankerAssetCode = 'Tanker Trailer is required'
     }
 
-    if (link.primeMoverAssetCode === link.tankerAssetCode) {
-      alert('Prime Mover and Tanker Trailer cannot be the same asset')
-      return false
+    if (link.primeMoverAssetCode && link.tankerAssetCode && link.primeMoverAssetCode === link.tankerAssetCode) {
+      errors.tankerAssetCode = 'Prime Mover and Tanker Trailer cannot be the same asset'
     }
 
     if (link.linkedFrom.trim() === '') {
-      alert('Linked From date is required')
-      return false
+      errors.linkedFrom = 'Linked From date is required'
     }
 
     if (
       link.linkedTo.trim() !== '' &&
       link.linkedTo < link.linkedFrom
     ) {
-      alert('Linked To cannot be earlier than Linked From')
-      return false
+      errors.linkedTo = 'Linked To cannot be earlier than Linked From'
     }
 
-    return true
+    setValidationErrors(errors)
+    return Object.keys(errors).length === 0
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    setSuccessMsg('')
+    setErrorMsg('')
+    setValidationErrors({})
 
     if (!validateForm()) {
       return
@@ -154,17 +161,17 @@ function PrimeMoverTankerLinkMaster({ assets = [] }) {
 
       if (editId === null) {
         await createPrimeMoverTankerLink(link)
-        alert('Prime Mover - Tanker link saved successfully')
+        setSuccessMsg('Prime Mover - Tanker link saved successfully')
       } else {
         await updatePrimeMoverTankerLink(editId, link)
-        alert('Prime Mover - Tanker link updated successfully')
+        setSuccessMsg('Prime Mover - Tanker link updated successfully')
       }
 
       setLink(emptyLink)
       setEditId(null)
       await loadLinks()
     } catch (error) {
-      alert(error.message || 'Unable to save Prime Mover - Tanker link')
+      setErrorMsg(error.message || 'Unable to save Prime Mover - Tanker link')
     } finally {
       setLoading(false)
     }
@@ -188,22 +195,18 @@ function PrimeMoverTankerLinkMaster({ assets = [] }) {
     setEditId(null)
   }
 
-  const handleDelete = async (item) => {
-    const confirmDelete = window.confirm(
-      `Delete link ${item.primeMoverAssetCode} -> ${item.tankerAssetCode}?`
-    )
-
-    if (!confirmDelete) {
-      return
-    }
+  const handleDelete = async () => {
+    setSuccessMsg('')
+    setErrorMsg('')
 
     try {
       setLoading(true)
-      await deletePrimeMoverTankerLink(item.id)
+      await deletePrimeMoverTankerLink(confirmDeleteItem.id)
+      setConfirmDeleteItem(null)
       await loadLinks()
-      alert('Prime Mover - Tanker link deleted successfully')
+      setSuccessMsg('Prime Mover - Tanker link deleted successfully')
     } catch (error) {
-      alert(error.message || 'Unable to delete link')
+      setErrorMsg(error.message || 'Unable to delete link')
     } finally {
       setLoading(false)
     }
@@ -227,12 +230,15 @@ function PrimeMoverTankerLinkMaster({ assets = [] }) {
   }
 
   const handleCloseLink = async () => {
+    setSuccessMsg('')
+    setErrorMsg('')
+
     if (!closeForm.linkId) {
       return
     }
 
     if (closeForm.linkedTo.trim() === '') {
-      alert('Close date is required')
+      setErrorMsg('Close date is required')
       return
     }
 
@@ -252,9 +258,9 @@ function PrimeMoverTankerLinkMaster({ assets = [] }) {
       })
 
       await loadLinks()
-      alert('Link closed successfully')
+      setSuccessMsg('Link closed successfully')
     } catch (error) {
-      alert(error.message || 'Unable to close link')
+      setErrorMsg(error.message || 'Unable to close link')
     } finally {
       setLoading(false)
     }
@@ -290,13 +296,38 @@ function PrimeMoverTankerLinkMaster({ assets = [] }) {
         </div>
       )}
 
+      {successMsg && (
+        <div className="success-box">{successMsg}</div>
+      )}
+
+      {errorMsg && (
+        <div className="error-box">{errorMsg}</div>
+      )}
+
+      {confirmDeleteItem && (
+        <div className="confirm-overlay">
+          <div className="confirm-box">
+            <p>Delete link <strong>{confirmDeleteItem.primeMoverAssetCode}</strong> → <strong>{confirmDeleteItem.tankerAssetCode}</strong>?</p>
+            <div className="confirm-actions">
+              <button onClick={handleDelete} disabled={loading}>
+                {loading ? 'Deleting...' : 'Yes, Delete'}
+              </button>
+              <button onClick={() => setConfirmDeleteItem(null)} disabled={loading}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit}>
         <div>
           <label>Prime Mover *</label>
           <select
             name="primeMoverAssetCode"
             value={link.primeMoverAssetCode}
-            onChange={handleChange}
+            onChange={(e) => { handleChange(e); setValidationErrors({ ...validationErrors, primeMoverAssetCode: '' }) }}
+            className={validationErrors.primeMoverAssetCode ? 'input-error' : ''}
           >
             <option value="">Select Prime Mover</option>
 
@@ -306,6 +337,9 @@ function PrimeMoverTankerLinkMaster({ assets = [] }) {
               </option>
             ))}
           </select>
+          {validationErrors.primeMoverAssetCode && (
+            <span className="field-error">{validationErrors.primeMoverAssetCode}</span>
+          )}
         </div>
 
         <div>
@@ -313,7 +347,8 @@ function PrimeMoverTankerLinkMaster({ assets = [] }) {
           <select
             name="tankerAssetCode"
             value={link.tankerAssetCode}
-            onChange={handleChange}
+            onChange={(e) => { handleChange(e); setValidationErrors({ ...validationErrors, tankerAssetCode: '' }) }}
+            className={validationErrors.tankerAssetCode ? 'input-error' : ''}
           >
             <option value="">Select Tanker Trailer</option>
 
@@ -324,6 +359,9 @@ function PrimeMoverTankerLinkMaster({ assets = [] }) {
               </option>
             ))}
           </select>
+          {validationErrors.tankerAssetCode && (
+            <span className="field-error">{validationErrors.tankerAssetCode}</span>
+          )}
         </div>
 
         <div>
@@ -332,8 +370,12 @@ function PrimeMoverTankerLinkMaster({ assets = [] }) {
             name="linkedFrom"
             type="date"
             value={link.linkedFrom}
-            onChange={handleChange}
+            onChange={(e) => { handleChange(e); setValidationErrors({ ...validationErrors, linkedFrom: '' }) }}
+            className={validationErrors.linkedFrom ? 'input-error' : ''}
           />
+          {validationErrors.linkedFrom && (
+            <span className="field-error">{validationErrors.linkedFrom}</span>
+          )}
         </div>
 
         <div>
@@ -342,8 +384,12 @@ function PrimeMoverTankerLinkMaster({ assets = [] }) {
             name="linkedTo"
             type="date"
             value={link.linkedTo}
-            onChange={handleChange}
+            onChange={(e) => { handleChange(e); setValidationErrors({ ...validationErrors, linkedTo: '' }) }}
+            className={validationErrors.linkedTo ? 'input-error' : ''}
           />
+          {validationErrors.linkedTo && (
+            <span className="field-error">{validationErrors.linkedTo}</span>
+          )}
         </div>
 
         <div>
@@ -564,7 +610,7 @@ function PrimeMoverTankerLinkMaster({ assets = [] }) {
 
                     <button
                       type="button"
-                      onClick={() => handleDelete(item)}
+                      onClick={() => { setSuccessMsg(''); setErrorMsg(''); setConfirmDeleteItem(item) }}
                       disabled={loading}
                     >
                       Delete

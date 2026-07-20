@@ -16,6 +16,8 @@ function FlowmeterRecordEntry({ locations = [], assets = [] }) {
   const [loading, setLoading] = useState(false)
   const [lastAppliedAt, setLastAppliedAt] = useState('')
   const [printedAt] = useState(() => new Date().toLocaleString())
+  const [successMsg, setSuccessMsg] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
 
   const flowmeterAssets = useMemo(() => {
     return (assets || []).filter((a) => String(a.status || '').toLowerCase() === 'active')
@@ -28,7 +30,7 @@ function FlowmeterRecordEntry({ locations = [], assets = [] }) {
       setRows(recordRows)
       setLastAppliedAt(new Date().toLocaleString())
     } catch (error) {
-      alert(error?.message || 'Failed to load flowmeter records')
+      setErrorMsg(error?.message || 'Failed to load flowmeter records')
     } finally {
       setLoading(false)
     }
@@ -49,7 +51,7 @@ function FlowmeterRecordEntry({ locations = [], assets = [] }) {
 
   const exportCsv = () => {
     if (!rows.length) {
-      alert('No rows available to export.')
+      setErrorMsg('No rows available to export.')
       return
     }
 
@@ -167,6 +169,16 @@ function FlowmeterRecordEntry({ locations = [], assets = [] }) {
       </div>
 
       <div>
+      {successMsg && (
+        <div className="success-box" onClick={() => setSuccessMsg('')}>
+          {successMsg}
+        </div>
+      )}
+      {errorMsg && (
+        <div className="error-box" onClick={() => setErrorMsg('')}>
+          {errorMsg}
+        </div>
+      )}
       <div className="page-title">
         <div>
           <h2>Flowmeter Records</h2>

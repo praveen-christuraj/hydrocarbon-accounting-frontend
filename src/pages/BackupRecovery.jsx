@@ -60,24 +60,39 @@ function BackupRecovery({ loggedInUser }) {
   const [currentPage, setCurrentPage] = useState(1)
   const [restoreCurrentPage, setRestoreCurrentPage] = useState(1)
   const [loading, setLoading] = useState(false)
+  const [successMsg, setSuccessMsg] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
+  const [validationErrors, setValidationErrors] = useState({})
+
+  // Confirm / Prompt overlays
+  const [confirmManualBackup, setConfirmManualBackup] = useState(false)
+  const [confirmDeleteBackup, setConfirmDeleteBackup] = useState(null)
+  const [deleteBackupText, setDeleteBackupText] = useState('')
+  const [confirmCleanup, setConfirmCleanup] = useState(false)
+  const [confirmRestoreRequest, setConfirmRestoreRequest] = useState(false)
+  const [confirmValidateRequest, setConfirmValidateRequest] = useState(null)
+  const [confirmExecuteRestore, setConfirmExecuteRestore] = useState(null)
+  const [executeConfirmText, setExecuteConfirmText] = useState('')
+  const [executeRemarks, setExecuteRemarks] = useState('')
+  const [approvalRemarks, setApprovalRemarks] = useState('')
+  const [actionRequest, setActionRequest] = useState(null) // { request, action }
+
+  const isAdminBootstrap =
+    String(loggedInUser?.username || '').toLowerCase() === 'admin' ||
+    (loggedInUser?.roles || []).some(
+      (role) =>
+        String(role?.role_name || role?.roleName || '').toLowerCase() ===
+        'admin'
+    ) ||
+    String(loggedInUser?.role_name || loggedInUser?.roleName || '').toLowerCase() ===
+      'admin'
 
   const hasPermission = (permissionName) => {
-    const username = String(loggedInUser?.username || '').toLowerCase()
-    const isAdmin =
-      username === 'admin' ||
-      (loggedInUser?.roles || []).some(
-        (role) =>
-          String(role?.role_name || role?.roleName || '').toLowerCase() ===
-          'admin'
-      ) ||
-      String(loggedInUser?.role_name || loggedInUser?.roleName || '').toLowerCase() ===
-        'admin'
-
-    if (isAdmin) return true
-
-    return (loggedInUser?.permissions || []).some((permission) => {
-      return permission.permissionName === permissionName
-    })
+    if (isAdminBootstrap) return true
+    if (!loggedInUser || !Array.isArray(loggedInUser.permissions)) return false
+    return loggedInUser.permissions.some(
+      (p) => p.permissionName === permissionName
+    )
   }
 
   const loadData = async () => {
@@ -99,7 +114,7 @@ function BackupRecovery({ loggedInUser }) {
       setCurrentPage(1)
       setRestoreCurrentPage(1)
     } catch (error) {
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       setLoading(false)
     }
@@ -132,8 +147,15 @@ function BackupRecovery({ loggedInUser }) {
 
   const saveSettings = async (event) => {
     event.preventDefault()
+    if (!hasPermission('Manage Backup Settings')) {
+      setErrorMsg('You do not have permission to manage backup settings')
+      return
+    }
+    setSuccessMsg('')
+    setErrorMsg('')
+    setValidationErrors({})
     if (settings.scheduleMode === 'Daily' && !settings.runTime) {
-      alert('Run time is required for daily schedule')
+      setValidationErrors({ runTime: 'Run time is required for daily schedule' })
       return
     }
 
@@ -141,10 +163,10 @@ function BackupRecovery({ loggedInUser }) {
       setLoading(true)
       const updated = await updateBackupSettings(settings)
       setSettings(updated)
-      alert('Backup settings saved')
+      setSuccessMsg('Backup settings saved')
       await loadData()
     } catch (error) {
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       setLoading(false)
     }
@@ -152,89 +174,110 @@ function BackupRecovery({ loggedInUser }) {
 
   const runManualBackup = async (event) => {
     event.preventDefault()
-    if (!window.confirm('Create a manual database backup now?')) return
+    if (!hasPermission('Create Manual Backup')) {
+      setErrorMsg('You do not have permission to create manual backups')
+      return
+    }
+    setSuccessMsg('')
+    setErrorMsg('')
+    setConfirmManualBackup(true)
+  }
 
+  const executeManualBackup = async () => {
+    if (!hasPermission('Create Manual Backup')) {
+      setErrorMsg('You do not have permission to create manual backups')
+      return
+    }
+    setConfirmManualBackup(false)
     try {
       setLoading(true)
       await createManualBackup(description || 'Manual backup')
       setDescription('')
       await loadData()
-      alert('Manual backup completed')
+      setSuccessMsg('Manual backup completed')
     } catch (error) {
       await loadData()
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       setLoading(false)
     }
   }
 
   const runVerifyChecksum = async (job) => {
+    setSuccessMsg('')
+    setErrorMsg('')
     try {
       setLoading(true)
       const result = await verifyBackupChecksum(job.id)
       await loadData()
-      alert(result.matched ? 'Checksum verified successfully' : 'Checksum mismatch detected')
+      setSuccessMsg(result.matched ? 'Checksum verified successfully' : 'Checksum mismatch detected')
     } catch (error) {
       await loadData()
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       setLoading(false)
     }
   }
 
   const runDownloadBackup = async (job) => {
+    setErrorMsg('')
     try {
       setLoading(true)
       await downloadBackup(job.id, job.fileName || `${job.backupNumber}.dump`)
       await loadData()
     } catch (error) {
       await loadData()
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       setLoading(false)
     }
   }
 
   const runDeleteBackup = async (job) => {
-    const confirmation = window.prompt(
-      `Type ${job.backupNumber} to delete the backup file. Job history will be retained.`
-    )
-    if (confirmation === null) return
-    if (confirmation.trim() !== job.backupNumber) {
-      alert('Confirmation text does not match the backup number')
+    setSuccessMsg('')
+    setErrorMsg('')
+    setDeleteBackupText('')
+    setConfirmDeleteBackup(job)
+  }
+
+  const executeDeleteBackup = async () => {
+    const job = confirmDeleteBackup
+    if (deleteBackupText.trim() !== job.backupNumber) {
+      setErrorMsg('Confirmation text does not match the backup number')
       return
     }
 
+    setConfirmDeleteBackup(null)
+    setDeleteBackupText('')
     try {
       setLoading(true)
       await deleteBackup(job.id)
       await loadData()
-      alert('Backup file deleted. Job history retained.')
+      setSuccessMsg('Backup file deleted. Job history retained.')
     } catch (error) {
       await loadData()
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       setLoading(false)
     }
   }
 
   const runCleanup = async () => {
-    if (
-      !window.confirm(
-        `Run retention cleanup now? This uses ${settings.retentionDays} retention days and keeps at least ${settings.keepMinimum} completed backups.`
-      )
-    ) {
-      return
-    }
+    setSuccessMsg('')
+    setErrorMsg('')
+    setConfirmCleanup(true)
+  }
 
+  const executeCleanup = async () => {
+    setConfirmCleanup(false)
     try {
       setLoading(true)
       const result = await cleanupBackups()
       await loadData()
-      alert(`Cleanup complete. Deleted: ${result.deleted_count}, Skipped: ${result.skipped_count}`)
+      setSuccessMsg(`Cleanup complete. Deleted: ${result.deleted_count}, Skipped: ${result.skipped_count}`)
     } catch (error) {
       await loadData()
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       setLoading(false)
     }
@@ -249,22 +292,25 @@ function BackupRecovery({ loggedInUser }) {
 
   const runCreateRestoreRequest = async (event) => {
     event.preventDefault()
+    setSuccessMsg('')
+    setErrorMsg('')
+    setValidationErrors({})
+
+    const errors = {}
     if (!restoreForm.backupJobId) {
-      alert('Select a completed backup')
-      return
+      errors.backupJobId = 'Select a completed backup'
     }
     if (restoreForm.reason.trim() === '') {
-      alert('Restore reason is required')
-      return
+      errors.reason = 'Restore reason is required'
     }
-    if (
-      !window.confirm(
-        'Create restore approval request? This does not restore the database.'
-      )
-    ) {
-      return
-    }
+    setValidationErrors(errors)
+    if (Object.keys(errors).length > 0) return
 
+    setConfirmRestoreRequest(true)
+  }
+
+  const executeCreateRestoreRequest = async () => {
+    setConfirmRestoreRequest(false)
     try {
       setLoading(true)
       await createBackupRestoreRequest({
@@ -278,27 +324,38 @@ function BackupRecovery({ loggedInUser }) {
         businessImpact: '',
       })
       await loadData()
-      alert('Restore approval request created')
+      setSuccessMsg('Restore approval request created')
     } catch (error) {
       await loadData()
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       setLoading(false)
     }
   }
 
   const runRestoreRequestAction = async (request, action) => {
-    const promptLabel =
-      action === 'approve'
-        ? 'Approval remarks'
-        : action === 'reject'
-          ? 'Rejection remarks'
-          : 'Cancellation remarks'
-    const remarks = window.prompt(promptLabel, '')
-    if (remarks === null) return
+    setSuccessMsg('')
+    setErrorMsg('')
+    setApprovalRemarks('')
+    setActionRequest({ request, action })
+  }
+
+  const executeRestoreRequestAction = async () => {
+    const { request, action } = actionRequest
+    const remarks = approvalRemarks
+
     if (action === 'reject' && remarks.trim() === '') {
-      alert('Rejection remarks are required')
+      setErrorMsg('Rejection remarks are required')
       return
+    }
+
+    setActionRequest(null)
+    setApprovalRemarks('')
+
+    const promptLabels = {
+      approve: 'Approval remarks',
+      reject: 'Rejection remarks',
+      cancel: 'Cancellation remarks',
     }
 
     try {
@@ -311,67 +368,62 @@ function BackupRecovery({ loggedInUser }) {
         await cancelBackupRestoreRequest(request.id, remarks)
       }
       await loadData()
-      alert(`Restore request ${action} action completed`)
+      setSuccessMsg(`Restore request ${action} action completed`)
     } catch (error) {
       await loadData()
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       setLoading(false)
     }
   }
 
   const runValidateRestoreRequest = async (request) => {
-    if (
-      !window.confirm(
-        'Validate this restore request against the separate validation database? Production will not be restored.'
-      )
-    ) {
-      return
-    }
+    setSuccessMsg('')
+    setErrorMsg('')
+    setConfirmValidateRequest(request)
+  }
 
+  const executeValidateRestoreRequest = async () => {
+    const request = confirmValidateRequest
+    setConfirmValidateRequest(null)
     try {
       setLoading(true)
       await validateBackupRestoreRequest(request.id)
       await loadData()
-      alert('Restore validation completed')
+      setSuccessMsg('Restore validation completed')
     } catch (error) {
       await loadData()
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       setLoading(false)
     }
   }
 
   const runExecuteRestoreRequest = async (request) => {
+    setSuccessMsg('')
+    setErrorMsg('')
+    setExecuteConfirmText('')
+    setExecuteRemarks('')
+    setConfirmExecuteRestore(request)
+  }
+
+  const executeExecuteRestoreRequest = async () => {
+    const request = confirmExecuteRestore
     const expectedConfirmation = `EXECUTE RESTORE ${request.requestNumber}`
-    if (
-      !window.confirm(
-        'This will restore the production database from the selected backup. A safety backup will be created first. Continue?'
-      )
-    ) {
+    if (executeConfirmText.trim() !== expectedConfirmation) {
+      setErrorMsg('Confirmation text does not match')
       return
     }
 
-    const confirmation = window.prompt(
-      `Type ${expectedConfirmation} to execute production restore.`
-    )
-    if (confirmation === null) return
-    if (confirmation.trim() !== expectedConfirmation) {
-      alert('Confirmation text does not match')
-      return
-    }
-
-    const remarks = window.prompt('Execution remarks', '')
-    if (remarks === null) return
-
+    setConfirmExecuteRestore(null)
     try {
       setLoading(true)
-      await executeBackupRestoreRequest(request.id, confirmation.trim(), remarks)
+      await executeBackupRestoreRequest(request.id, executeConfirmText.trim(), executeRemarks)
       await loadData()
-      alert('Production restore completed')
+      setSuccessMsg('Production restore completed')
     } catch (error) {
       await loadData()
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       setLoading(false)
     }
@@ -386,6 +438,167 @@ function BackupRecovery({ loggedInUser }) {
         </div>
         <span className="record-count">{jobs.length} Jobs</span>
       </div>
+
+      {successMsg && (
+        <div className="success-box">{successMsg}</div>
+      )}
+
+      {errorMsg && (
+        <div className="error-box">{errorMsg}</div>
+      )}
+
+      {validationErrors.runTime && (
+        <div className="error-box">{validationErrors.runTime}</div>
+      )}
+
+      {/* Confirm: Manual Backup */}
+      {confirmManualBackup && (
+        <div className="confirm-overlay">
+          <div className="confirm-box">
+            <p>Create a manual database backup now?</p>
+            <div className="confirm-actions">
+              <button onClick={executeManualBackup} disabled={loading}>
+                {loading ? 'Creating...' : 'Yes, Create Backup'}
+              </button>
+              <button onClick={() => setConfirmManualBackup(false)} disabled={loading}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm: Delete Backup */}
+      {confirmDeleteBackup && (
+        <div className="confirm-overlay">
+          <div className="confirm-box">
+            <p>Type <strong>{confirmDeleteBackup.backupNumber}</strong> to delete the backup file. Job history will be retained.</p>
+            <input
+              type="text"
+              value={deleteBackupText}
+              onChange={(e) => setDeleteBackupText(e.target.value)}
+              placeholder={confirmDeleteBackup.backupNumber}
+            />
+            <div className="confirm-actions">
+              <button onClick={executeDeleteBackup} disabled={loading}>
+                {loading ? 'Deleting...' : 'Confirm Delete'}
+              </button>
+              <button onClick={() => { setConfirmDeleteBackup(null); setDeleteBackupText('') }} disabled={loading}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm: Cleanup */}
+      {confirmCleanup && (
+        <div className="confirm-overlay">
+          <div className="confirm-box">
+            <p>Run retention cleanup now? This uses {settings.retentionDays} retention days and keeps at least {settings.keepMinimum} completed backups.</p>
+            <div className="confirm-actions">
+              <button onClick={executeCleanup} disabled={loading}>
+                {loading ? 'Cleaning...' : 'Yes, Run Cleanup'}
+              </button>
+              <button onClick={() => setConfirmCleanup(false)} disabled={loading}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm: Restore Request */}
+      {confirmRestoreRequest && (
+        <div className="confirm-overlay">
+          <div className="confirm-box">
+            <p>Create restore approval request? This does not restore the database.</p>
+            <div className="confirm-actions">
+              <button onClick={executeCreateRestoreRequest} disabled={loading}>
+                {loading ? 'Creating...' : 'Yes, Create Request'}
+              </button>
+              <button onClick={() => setConfirmRestoreRequest(false)} disabled={loading}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm: Validate Restore Request */}
+      {confirmValidateRequest && (
+        <div className="confirm-overlay">
+          <div className="confirm-box">
+            <p>Validate this restore request against the separate validation database? Production will not be restored.</p>
+            <div className="confirm-actions">
+              <button onClick={executeValidateRestoreRequest} disabled={loading}>
+                {loading ? 'Validating...' : 'Yes, Validate'}
+              </button>
+              <button onClick={() => setConfirmValidateRequest(null)} disabled={loading}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm: Execute Restore */}
+      {confirmExecuteRestore && (
+        <div className="confirm-overlay">
+          <div className="confirm-box">
+            <p>This will restore the production database from the selected backup. A safety backup will be created first. Continue?</p>
+            <label>Type <strong>EXECUTE RESTORE {confirmExecuteRestore.requestNumber}</strong> to confirm:</label>
+            <input
+              type="text"
+              value={executeConfirmText}
+              onChange={(e) => setExecuteConfirmText(e.target.value)}
+              placeholder={`EXECUTE RESTORE ${confirmExecuteRestore.requestNumber}`}
+            />
+            <label>Execution remarks</label>
+            <input
+              type="text"
+              value={executeRemarks}
+              onChange={(e) => setExecuteRemarks(e.target.value)}
+              placeholder="Optional remarks"
+            />
+            <div className="confirm-actions">
+              <button onClick={executeExecuteRestoreRequest} disabled={loading}>
+                {loading ? 'Executing...' : 'Execute Restore'}
+              </button>
+              <button onClick={() => { setConfirmExecuteRestore(null); setExecuteConfirmText(''); setExecuteRemarks('') }} disabled={loading}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Prompt: Approval / Rejection / Cancellation remarks */}
+      {actionRequest && (
+        <div className="confirm-overlay">
+          <div className="confirm-box">
+            <p>
+              {actionRequest.action === 'approve' ? 'Approval remarks' :
+               actionRequest.action === 'reject' ? 'Rejection remarks' :
+               'Cancellation remarks'}
+            </p>
+            <input
+              type="text"
+              value={approvalRemarks}
+              onChange={(e) => setApprovalRemarks(e.target.value)}
+              placeholder={actionRequest.action === 'reject' ? 'Required for rejection' : 'Optional'}
+            />
+            <div className="confirm-actions">
+              <button onClick={executeRestoreRequestAction} disabled={loading}>
+                {loading ? 'Processing...' : 'Confirm'}
+              </button>
+              <button onClick={() => { setActionRequest(null); setApprovalRemarks('') }} disabled={loading}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="backup-kpi-grid">
         <div className="info-box">
@@ -412,6 +625,8 @@ function BackupRecovery({ loggedInUser }) {
         </div>
       </div>
 
+      {hasPermission('Create Manual Backup') && (
+      <>
       <div className="section-title">
         <h3>Manual Backup</h3>
         <p>Create an immediate PostgreSQL backup using the backend server.</p>
@@ -435,7 +650,10 @@ function BackupRecovery({ loggedInUser }) {
           </button>
         </div>
       </form>
+      </>)}
 
+      {hasPermission('Manage Backup Settings') && (
+      <>
       <div className="section-title">
         <h3>Automatic Backup Settings</h3>
         <p>Frontend-controlled schedule. The backend scheduler executes due jobs.</p>
@@ -478,7 +696,7 @@ function BackupRecovery({ loggedInUser }) {
           <input
             type="time"
             value={settings.runTime}
-            onChange={(event) => updateField('runTime', event.target.value)}
+            onChange={(event) => { updateField('runTime', event.target.value); setValidationErrors({ ...validationErrors, runTime: '' }) }}
           />
         </div>
 
@@ -526,7 +744,8 @@ function BackupRecovery({ loggedInUser }) {
           </button>
         </div>
       </form>
-
+      </>)}
+      
       <div className="section-title">
         <h3>Backup History</h3>
         <p>Completed and failed backup jobs are retained for audit and operational review.</p>
@@ -671,7 +890,8 @@ function BackupRecovery({ loggedInUser }) {
             <label>Completed Backup</label>
             <select
               value={restoreForm.backupJobId}
-              onChange={(event) => updateRestoreField('backupJobId', event.target.value)}
+              onChange={(event) => { updateRestoreField('backupJobId', event.target.value); setValidationErrors({ ...validationErrors, backupJobId: '' }) }}
+              className={validationErrors.backupJobId ? 'input-error' : ''}
             >
               <option value="">Select backup</option>
               {completedBackupOptions.map((job) => (
@@ -680,15 +900,22 @@ function BackupRecovery({ loggedInUser }) {
                 </option>
               ))}
             </select>
+            {validationErrors.backupJobId && (
+              <span className="field-error">{validationErrors.backupJobId}</span>
+            )}
           </div>
           <div className="full-width-field">
             <label>Reason</label>
             <textarea
               rows="3"
               value={restoreForm.reason}
-              onChange={(event) => updateRestoreField('reason', event.target.value)}
+              onChange={(event) => { updateRestoreField('reason', event.target.value); setValidationErrors({ ...validationErrors, reason: '' }) }}
               placeholder="Explain why this backup may be needed for recovery"
+              className={validationErrors.reason ? 'input-error' : ''}
             />
+            {validationErrors.reason && (
+              <span className="field-error">{validationErrors.reason}</span>
+            )}
           </div>
           <div className="full-width-field">
             <label>Business Impact</label>

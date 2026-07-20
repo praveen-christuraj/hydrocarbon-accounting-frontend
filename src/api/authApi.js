@@ -1,13 +1,11 @@
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
-
-const AUTH_TOKEN_KEY = 'hydrocarbonAccessToken'
-const TOKEN_STORAGE_KEYS = [
-  AUTH_TOKEN_KEY,
-  'hydrocarbon_access_token',
-  'access_token',
-  'accessToken',
-]
+import { apiPost, apiGet } from './apiClient'
+import {
+  clearAccessToken,
+  getStoredAccessToken,
+  getStoredRefreshToken,
+  saveAccessToken,
+  saveRefreshToken,
+} from './authToken'
 
 const convertLoggedInUserFromApi = (data) => {
   const user = data.user
@@ -16,6 +14,7 @@ const convertLoggedInUserFromApi = (data) => {
     id: user.id,
     fullName: user.full_name,
     username: user.username,
+    userCode: user.username,
     email: user.email,
     phone: user.phone || '',
     department: user.department || '',
@@ -40,46 +39,17 @@ const convertLoggedInUserFromApi = (data) => {
   }
 }
 
-export const getStoredAccessToken = () => {
-  for (const key of TOKEN_STORAGE_KEYS) {
-    const token = localStorage.getItem(key)
-
-    if (token && token.trim() !== '') {
-      return token.trim()
-    }
+const saveLoginTokens = (data) => {
+  if (data.access_token) {
+    saveAccessToken(data.access_token)
   }
-
-  return ''
-}
-
-export const saveAccessToken = (token) => {
-  clearAccessToken()
-  localStorage.setItem(AUTH_TOKEN_KEY, token)
-}
-
-export const clearAccessToken = () => {
-  TOKEN_STORAGE_KEYS.forEach((key) => {
-    localStorage.removeItem(key)
-  })
+  if (data.refresh_token) {
+    saveRefreshToken(data.refresh_token)
+  }
 }
 
 export const loginUser = async (username, password) => {
-  const response = await fetch(`${API_BASE_URL}/auth/login`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      username,
-      password,
-    }),
-  })
-
-  const data = await response.json()
-
-  if (!response.ok) {
-    throw new Error(data.detail || 'Login failed')
-  }
+  const data = await apiPost('/auth/login', { username, password })
 
   if (data.requires_2fa) {
     return {
@@ -93,78 +63,70 @@ export const loginUser = async (username, password) => {
     throw new Error('Login token missing from backend response')
   }
 
-  saveAccessToken(data.access_token)
-
+  saveLoginTokens(data)
   return convertLoggedInUserFromApi(data)
 }
 
 export const verifyLogin2FA = async (challengeId, code) => {
-  const response = await fetch(`${API_BASE_URL}/auth/2fa/verify`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      challenge_id: challengeId,
-      code,
-    }),
+  const data = await apiPost('/auth/2fa/verify', {
+    challenge_id: challengeId,
+    code,
   })
 
-  const data = await response.json()
-
-  if (!response.ok) {
-    throw new Error(data.detail || '2FA verification failed')
-  }
-
-  saveAccessToken(data.access_token)
+  saveLoginTokens(data)
   return convertLoggedInUserFromApi(data)
 }
 
 export const requestPasswordReset = async (username, reason = '', reset2FA = false) => {
-  const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      username,
-      reason,
-      reset_2fa: Boolean(reset2FA),
-    }),
+  const data = await apiPost('/auth/forgot-password', {
+    username,
+    reason,
+    reset_2fa: Boolean(reset2FA),
   })
-
-  const data = await response.json()
-
-  if (!response.ok) {
-    throw new Error(data.detail || 'Password reset request failed')
-  }
-
   return data
 }
 
 export const getCurrentUser = async () => {
   const token = getStoredAccessToken()
-
   if (!token) {
     return null
   }
 
-  const response = await fetch(`${API_BASE_URL}/auth/me`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  })
-
-  const data = await response.json()
-
-  if (!response.ok) {
+  try {
+    const data = await apiGet('/auth/me')
+    return convertLoggedInUserFromApi(data)
+  } catch {
     clearAccessToken()
-    throw new Error(data.detail || 'Session expired. Please login again.')
+    return null
   }
-
-  return convertLoggedInUserFromApi(data)
 }
 
-export const logoutUser = () => {
+export const refreshAccessToken = async () => {
+  const refreshToken = getStoredRefreshToken()
+  if (!refreshToken) {
+    return false
+  }
+
+  try {
+    const data = await apiPost('/auth/refresh', { refresh_token: refreshToken })
+    if (data.access_token) {
+      saveAccessToken(data.access_token)
+    }
+    if (data.refresh_token) {
+      saveRefreshToken(data.refresh_token)
+    }
+    return true
+  } catch {
+    clearAccessToken()
+    return false
+  }
+}
+
+export const logoutUser = async () => {
+  try {
+    await apiPost('/auth/logout', {})
+  } catch {
+    // Best-effort: clear locally even if server call fails
+  }
   clearAccessToken()
 }

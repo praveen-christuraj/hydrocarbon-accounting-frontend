@@ -155,6 +155,9 @@ function DashboardBuilder({
 }) {
   const [loading, setLoading] = useState(false)
   const [sourcesLoading, setSourcesLoading] = useState(false)
+  const [successMsg, setSuccessMsg] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
+  const [confirmRemoveWidget, setConfirmRemoveWidget] = useState(false)
 
   const [configs, setConfigs] = useState([])
   const [selectedConfigId, setSelectedConfigId] = useState('')
@@ -275,7 +278,7 @@ function DashboardBuilder({
       const rows = Array.isArray(data) ? data : Array.isArray(data?.rows) ? data.rows : []
       setDataSources(rows)
     } catch (e) {
-      alert(e.message || 'Unable to load dashboard data sources')
+      setErrorMsg(e.message || 'Unable to load dashboard data sources')
       setDataSources([])
     } finally {
       setSourcesLoading(false)
@@ -308,12 +311,12 @@ function DashboardBuilder({
 
   const saveDraftToLocalStorage = () => {
     localStorage.setItem(localDraftKey, JSON.stringify(configJson))
-    alert('Draft saved locally (browser).')
+    setSuccessMsg('Draft saved locally (browser).')
   }
 
   const clearLocalDraft = () => {
     localStorage.removeItem(localDraftKey)
-    alert('Local draft cleared.')
+    setSuccessMsg('Local draft cleared.')
   }
 
   useEffect(() => {
@@ -323,7 +326,7 @@ function DashboardBuilder({
         await loadConfigs()
         await loadDataSources()
       } catch (e) {
-        alert(e.message || 'Unable to initialize builder')
+        setErrorMsg(e.message || 'Unable to initialize builder')
       } finally {
         setLoading(false)
       }
@@ -362,7 +365,7 @@ function DashboardBuilder({
         const loadedLocal = loadDraftFromLocalStorage()
         if (!loadedLocal) await hydrateFromActiveVersion(cfg)
       } catch (e) {
-        alert(e.message || 'Unable to load dashboard config')
+        setErrorMsg(e.message || 'Unable to load dashboard config')
       } finally {
         setLoading(false)
       }
@@ -398,9 +401,11 @@ function DashboardBuilder({
 
   const removeWidget = () => {
     if (!selectedWidgetId) return
-    const ok = window.confirm('Remove this widget?')
-    if (!ok) return
+    setConfirmRemoveWidget(true)
+  }
 
+  const confirmRemoveWidgetAction = () => {
+    setConfirmRemoveWidget(false)
     setConfigJson((prev) => {
       const nextWidgets = { ...prev.widgets }
       delete nextWidgets[selectedWidgetId]
@@ -508,7 +513,7 @@ function DashboardBuilder({
     applyDashboardFiltersToWidgetParams(widget)
 
     const v = validateWidgetParams(widget)
-    if (!v.ok) return alert(v.msg)
+    if (!v.ok) { setErrorMsg(v.msg); return }
 
     setWidgetPreview((p) => ({ ...p, [selectedWidgetId]: { loading: true } }))
     try {
@@ -534,8 +539,8 @@ function DashboardBuilder({
   }
 
   const createNewConfigHandler = async () => {
-    if (!name.trim()) return alert('Name is required')
-    if (scopeType === 'LOCATION' && !locationCode.trim()) return alert('Location is required for LOCATION scope')
+    if (!name.trim()) { setErrorMsg('Name is required'); return }
+    if (scopeType === 'LOCATION' && !locationCode.trim()) { setErrorMsg('Location is required for LOCATION scope'); return }
 
     try {
       setLoading(true)
@@ -548,16 +553,16 @@ function DashboardBuilder({
       const cfg = await createDashboardConfig(payload)
       await loadConfigs()
       setSelectedConfigId(String(cfg.id))
-      alert('Dashboard config created. Now add widgets and Publish.')
+      setSuccessMsg('Dashboard config created. Now add widgets and Publish.')
     } catch (e) {
-      alert(e.message || 'Unable to create dashboard config')
+      setErrorMsg(e.message || 'Unable to create dashboard config')
     } finally {
       setLoading(false)
     }
   }
 
   const updateConfigMetaHandler = async () => {
-    if (!selectedConfigId) return alert('Select a dashboard config first')
+    if (!selectedConfigId) { setErrorMsg('Select a dashboard config first'); return }
     try {
       setLoading(true)
       await updateDashboardConfig(selectedConfigId, {
@@ -567,28 +572,28 @@ function DashboardBuilder({
         remarks: remarks ? remarks.trim() : null,
       })
       await loadConfigs()
-      alert('Config info updated.')
+      setSuccessMsg('Config info updated.')
     } catch (e) {
-      alert(e.message || 'Unable to update config')
+      setErrorMsg(e.message || 'Unable to update config')
     } finally {
       setLoading(false)
     }
   }
 
   const publishHandler = async () => {
-    if (!selectedConfigId) return alert('Select a dashboard config first')
+    if (!selectedConfigId) { setErrorMsg('Select a dashboard config first'); return }
 
     const widgetIds = Object.keys(configJson.widgets || {})
     for (const wid of widgetIds) {
       const found = (configJson.layout || []).some((l) => l.i === wid)
-      if (!found) return alert(`Widget ${wid} missing layout item`)
+      if (!found) { setErrorMsg(`Widget ${wid} missing layout item`); return }
     }
 
     for (const wid of widgetIds) {
       const w = configJson.widgets[wid]
       if (w.type === 'TEXT') continue
       const v = validateWidgetParams(w)
-      if (!v.ok) return alert(`Widget "${w.title || wid}": ${v.msg}`)
+      if (!v.ok) { setErrorMsg(`Widget "${w.title || wid}": ${v.msg}`); return }
     }
 
     for (const wid of widgetIds) {
@@ -596,7 +601,7 @@ function DashboardBuilder({
       if (w.type === 'CHART') {
         const xField = String(w.config?.xField || '').trim()
         const yField = String(w.config?.yField || '').trim()
-        if (!xField || !yField) return alert(`Chart "${w.title || wid}" must have xField and yField`)
+        if (!xField || !yField) { setErrorMsg(`Chart "${w.title || wid}" must have xField and yField`); return }
       }
     }
 
@@ -606,9 +611,9 @@ function DashboardBuilder({
       setDirty(false)
       clearLocalDraft()
       await loadConfigs()
-      alert('Published successfully. Open /dashboard to view.')
+      setSuccessMsg('Published successfully. Open /dashboard to view.')
     } catch (e) {
-      alert(e.message || 'Publish failed')
+      setErrorMsg(e.message || 'Publish failed')
     } finally {
       setLoading(false)
     }
@@ -682,6 +687,27 @@ function DashboardBuilder({
 
   return (
     <div>
+      {successMsg && (
+        <div className="success-box" onClick={() => setSuccessMsg('')}>
+          {successMsg}
+        </div>
+      )}
+      {errorMsg && (
+        <div className="error-box" onClick={() => setErrorMsg('')}>
+          {errorMsg}
+        </div>
+      )}
+      {confirmRemoveWidget && (
+        <div className="confirm-overlay">
+          <div className="confirm-dialog">
+            <p>Remove this widget?</p>
+            <div className="confirm-actions">
+              <button onClick={confirmRemoveWidgetAction}>Yes</button>
+              <button onClick={() => setConfirmRemoveWidget(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="page-title">
         <div>
           <h2>Dashboard Builder</h2>

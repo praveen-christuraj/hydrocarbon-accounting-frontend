@@ -22,6 +22,9 @@ function OperationTaskManager({ reloadOperationTransactions }) {
   const [dateTo, setDateTo] = useState('')
   const [remarks, setRemarks] = useState('')
   const [loading, setLoading] = useState(false)
+  const [successMsg, setSuccessMsg] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
+  const [confirmAction, setConfirmAction] = useState(null)
 
   const counts = useMemo(() => {
     return tasks.reduce(
@@ -59,7 +62,7 @@ function OperationTaskManager({ reloadOperationTransactions }) {
         setSelectedTask(refreshed || null)
       }
     } catch (error) {
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       setLoading(false)
     }
@@ -71,7 +74,7 @@ function OperationTaskManager({ reloadOperationTransactions }) {
       setEvents(data)
     } catch (error) {
       setEvents([])
-      alert(error.message)
+      setErrorMsg(error.message)
     }
   }
 
@@ -99,7 +102,33 @@ function OperationTaskManager({ reloadOperationTransactions }) {
     await loadEvents(task.id)
   }
 
+  const getConfirmMessage = (action) => {
+    switch (action) {
+      case 'approve': return 'Approve the linked operation ticket?'
+      case 'reject': return 'Reject the linked operation ticket?'
+      case 'admin-revoke-approved': return 'Admin revoke will move the approved ticket back to Submitted and reverse derived ledger rows. Continue?'
+      case 'admin-reject-revoke': return 'Reject this approved transaction revoke request?'
+      default: return ''
+    }
+  }
+
   const runAction = async (action) => {
+    if (!selectedTask) return
+    const confirmMsg = getConfirmMessage(action)
+    if (confirmMsg) {
+      setConfirmAction({ action, message: confirmMsg })
+      return
+    }
+    await executeAction(action)
+  }
+
+  const confirmRunAction = async () => {
+    if (!confirmAction) return
+    setConfirmAction(null)
+    await executeAction(confirmAction.action)
+  }
+
+  const executeAction = async (action) => {
     if (!selectedTask) return
     setLoading(true)
     try {
@@ -108,29 +137,23 @@ function OperationTaskManager({ reloadOperationTransactions }) {
       } else if (action === 'release') {
         await releaseOperationTask(selectedTask.id, remarks)
       } else if (action === 'approve') {
-        if (!window.confirm('Approve the linked operation ticket?')) return
         await approveOperationTask(selectedTask.id, remarks || 'Approved from Task Manager')
+        setSuccessMsg('Operation ticket approved.')
       } else if (action === 'reject') {
-        if (!window.confirm('Reject the linked operation ticket?')) return
         await rejectOperationTask(selectedTask.id, remarks || 'Rejected from Task Manager')
+        setSuccessMsg('Operation ticket rejected.')
       } else if (action === 'admin-revoke-approved') {
-        if (
-          !window.confirm(
-            'Admin revoke will move the approved ticket back to Submitted and reverse derived ledger rows. Continue?'
-          )
-        ) {
-          return
-        }
         await adminRevokeApprovedTransactionTask(
           selectedTask.id,
           remarks || 'Admin revoked approved transaction for correction'
         )
+        setSuccessMsg('Approved transaction revoked.')
       } else if (action === 'admin-reject-revoke') {
-        if (!window.confirm('Reject this approved transaction revoke request?')) return
         await adminRejectApprovedRevokeTask(
           selectedTask.id,
           remarks || 'Admin rejected approved transaction revoke request'
         )
+        setSuccessMsg('Revoke request rejected.')
       }
 
       await loadTasks()
@@ -142,7 +165,7 @@ function OperationTaskManager({ reloadOperationTransactions }) {
       }
       setRemarks('')
     } catch (error) {
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       setLoading(false)
     }
@@ -160,6 +183,27 @@ function OperationTaskManager({ reloadOperationTransactions }) {
 
   return (
     <div>
+      {successMsg && (
+        <div className="success-box" onClick={() => setSuccessMsg('')}>
+          {successMsg}
+        </div>
+      )}
+      {errorMsg && (
+        <div className="error-box" onClick={() => setErrorMsg('')}>
+          {errorMsg}
+        </div>
+      )}
+      {confirmAction && (
+        <div className="confirm-overlay">
+          <div className="confirm-dialog">
+            <p>{confirmAction.message}</p>
+            <div className="confirm-actions">
+              <button onClick={confirmRunAction}>Yes</button>
+              <button onClick={() => setConfirmAction(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="page-title">
         <div>
           <h2>Task Manager</h2>

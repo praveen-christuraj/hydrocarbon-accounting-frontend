@@ -9,6 +9,7 @@ function AuditLog() {
   const [loading, setLoading] = useState(false)
   const [expandedLogId, setExpandedLogId] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
+  const [errorMsg, setErrorMsg] = useState('')
 
   const [filters, setFilters] = useState({
     moduleName: '',
@@ -30,7 +31,7 @@ function AuditLog() {
       setCurrentPage(1)
       setExpandedLogId(null)
     } catch (error) {
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       setLoading(false)
     }
@@ -101,6 +102,10 @@ function AuditLog() {
 
         <span className="record-count">{auditLogs.length} Logs</span>
       </div>
+
+      {errorMsg && (
+        <div className="error-box">{errorMsg}</div>
+      )}
 
       <form onSubmit={handleApplyFilters}>
         <div>

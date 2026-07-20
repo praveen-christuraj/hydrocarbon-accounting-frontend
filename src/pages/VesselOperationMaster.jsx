@@ -14,6 +14,9 @@ function VesselOperationMaster({ locations = [], assetTypes = [] }) {
   })
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(false)
+  const [successMsg, setSuccessMsg] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
+  const [confirmDelete, setConfirmDelete] = useState(null)
 
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState({
@@ -39,7 +42,7 @@ function VesselOperationMaster({ locations = [], assetTypes = [] }) {
       const data = await getVesselOperations(filters)
       setRows(Array.isArray(data) ? data : [])
     } catch (e) {
-      alert(e.message || 'Unable to load vessel operations')
+      setErrorMsg(e.message || 'Unable to load vessel operations')
     } finally {
       setLoading(false)
     }
@@ -104,25 +107,30 @@ function VesselOperationMaster({ locations = [], assetTypes = [] }) {
 
       resetForm()
       await load()
+      setSuccessMsg(editing?.id ? 'Vessel operation updated successfully.' : 'Vessel operation created successfully.')
     } catch (e) {
-      alert(e.message || 'Unable to save vessel operation')
+      setErrorMsg(e.message || 'Unable to save vessel operation')
     } finally {
       setLoading(false)
     }
   }
 
   const remove = async (row) => {
-    const ok = window.confirm(
-      `Delete vessel operation ${row.operation_label} (${row.operation_code})?`
-    )
-    if (!ok) return
+    setConfirmDelete(row)
+  }
+
+  const confirmRemove = async () => {
+    if (!confirmDelete) return
 
     try {
       setLoading(true)
-      await deleteVesselOperation(row.id)
+      await deleteVesselOperation(confirmDelete.id)
+      setConfirmDelete(null)
+      setSuccessMsg(`Vessel operation ${confirmDelete.operation_label} deleted successfully.`)
       await load()
     } catch (e) {
-      alert(e.message || 'Unable to delete vessel operation')
+      setErrorMsg(e.message || 'Unable to delete vessel operation')
+      setConfirmDelete(null)
     } finally {
       setLoading(false)
     }
@@ -130,6 +138,27 @@ function VesselOperationMaster({ locations = [], assetTypes = [] }) {
 
   return (
     <div>
+      {successMsg && (
+        <div className="success-box" onClick={() => setSuccessMsg('')}>
+          {successMsg}
+        </div>
+      )}
+      {errorMsg && (
+        <div className="error-box" onClick={() => setErrorMsg('')}>
+          {errorMsg}
+        </div>
+      )}
+      {confirmDelete && (
+        <div className="confirm-overlay">
+          <div className="confirm-dialog">
+            <p>Delete vessel operation {confirmDelete.operation_label} ({confirmDelete.operation_code})?</p>
+            <div className="confirm-actions">
+              <button onClick={confirmRemove}>Yes, Delete</button>
+              <button onClick={() => setConfirmDelete(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="page-title">
         <div>
           <h2>Vessel Operation Master</h2>

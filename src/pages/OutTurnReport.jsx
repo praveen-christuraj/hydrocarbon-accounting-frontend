@@ -18,6 +18,8 @@ function OutTurnReport({ locations, assets }) {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
+  const [successMsg, setSuccessMsg] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
 
   const activeLocations = useMemo(() => {
     return (locations || []).filter((location) => location.status === 'Active')
@@ -83,7 +85,7 @@ function OutTurnReport({ locations, assets }) {
       setRows(data)
       setCurrentPage(1)
     } catch (error) {
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       setLoading(false)
     }
@@ -200,7 +202,7 @@ function OutTurnReport({ locations, assets }) {
 
   const handleExportCsv = () => {
     if (rows.length === 0) {
-      alert('No OTR rows available to export')
+      setErrorMsg('No OTR rows available to export')
       return
     }
 
@@ -255,7 +257,7 @@ function OutTurnReport({ locations, assets }) {
 
   const handlePrintReport = () => {
     if (rows.length === 0) {
-      alert('No OTR rows available to print')
+      setErrorMsg('No OTR rows available to print')
       return
     }
 
@@ -264,6 +266,16 @@ function OutTurnReport({ locations, assets }) {
 
   return (
     <div className="out-turn-report-page">
+      {successMsg && (
+        <div className="success-box" onClick={() => setSuccessMsg('')}>
+          {successMsg}
+        </div>
+      )}
+      {errorMsg && (
+        <div className="error-box" onClick={() => setErrorMsg('')}>
+          {errorMsg}
+        </div>
+      )}
       <div className="page-title">
         <div>
           <h2>Out-Turn Report</h2>

@@ -45,6 +45,10 @@ function OperationTemplateMaster({
   const [layoutLoading, setLayoutLoading] = useState(false)
   const [layouts, setLayouts] = useState([])
   const [selectedLayoutId, setSelectedLayoutId] = useState('')
+  const [successMsg, setSuccessMsg] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
+  const [confirmRemoveField, setConfirmRemoveField] = useState(null)
+  const [confirmDeleteTemplate, setConfirmDeleteTemplate] = useState(null)
   const [draggingSectionId, setDraggingSectionId] = useState('')
   const [draggingItemId, setDraggingItemId] = useState('')
   const [layoutDraft, setLayoutDraft] = useState({
@@ -141,17 +145,17 @@ function OperationTemplateMaster({
 
   const handleAddField = () => {
     if (field.fieldName.trim() === '') {
-      alert('Field Name is required')
+      setErrorMsg('Field Name is required')
       return
     }
 
     if (field.fieldCode.trim() === '') {
-      alert('Field Code is required')
+      setErrorMsg('Field Code is required')
       return
     }
 
     if (field.dataType.trim() === '') {
-      alert('Data Type is required')
+      setErrorMsg('Data Type is required')
       return
     }
 
@@ -160,7 +164,7 @@ function OperationTemplateMaster({
     })
 
     if (duplicateFieldCode) {
-      alert('Field Code already exists in this template.')
+      setErrorMsg('Field Code already exists in this template.')
       return
     }
 
@@ -169,7 +173,7 @@ function OperationTemplateMaster({
     })
 
     if (duplicateFieldName) {
-      alert('Field Name already exists in this template.')
+      setErrorMsg('Field Name already exists in this template.')
       return
     }
 
@@ -190,35 +194,33 @@ function OperationTemplateMaster({
   }
 
   const handleRemoveField = (indexToRemove) => {
-    const confirmRemove = window.confirm(
-      'Are you sure you want to remove this field?'
-    )
+    setConfirmRemoveField(indexToRemove)
+  }
 
-    if (confirmRemove === false) {
-      return
-    }
-
+  const confirmRemoveFieldAction = () => {
+    if (confirmRemoveField === null) return
     setTemplate({
       ...template,
-      fields: template.fields.filter((item, index) => index !== indexToRemove),
+      fields: template.fields.filter((item, index) => index !== confirmRemoveField),
     })
+    setConfirmRemoveField(null)
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
 
     if (template.templateName.trim() === '') {
-      alert('Template Name is required')
+      setErrorMsg('Template Name is required')
       return
     }
 
     if (template.operationTypeCode.trim() === '') {
-      alert('Operation Type is required')
+      setErrorMsg('Operation Type is required')
       return
     }
 
     if (template.fields.length === 0) {
-      alert('Please add at least one operation template field')
+      setErrorMsg('Please add at least one operation template field')
       return
     }
 
@@ -230,7 +232,7 @@ function OperationTemplateMaster({
     })
 
     if (duplicateTemplate) {
-      alert('Operation Template Name already exists.')
+      setErrorMsg('Operation Template Name already exists.')
       return
     }
 
@@ -239,10 +241,10 @@ function OperationTemplateMaster({
 
       if (editId === null) {
         await createOperationTemplate(template)
-        alert('Operation Template saved successfully')
+        setSuccessMsg('Operation Template saved successfully')
       } else {
         await updateOperationTemplate(editId, template)
-        alert('Operation Template updated successfully')
+        setSuccessMsg('Operation Template updated successfully')
       }
 
       await reloadOperationTemplates()
@@ -250,7 +252,7 @@ function OperationTemplateMaster({
       setField(emptyField)
       setEditId(null)
     } catch (error) {
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       setLoading(false)
     }
@@ -272,13 +274,13 @@ function OperationTemplateMaster({
   }
 
   const handleDelete = async (templateId) => {
-    const confirmDelete = window.confirm(
-      'Are you sure you want to delete this operation template?'
-    )
+    setConfirmDeleteTemplate(templateId)
+  }
 
-    if (confirmDelete === false) {
-      return
-    }
+  const confirmDeleteTemplateAction = async () => {
+    const templateId = confirmDeleteTemplate
+    setConfirmDeleteTemplate(null)
+    if (!templateId) return
 
     try {
       setLoading(true)
@@ -294,9 +296,9 @@ function OperationTemplateMaster({
         setSelectedLayoutId('')
       }
 
-      alert('Operation Template deleted successfully')
+      setSuccessMsg('Operation Template deleted successfully')
     } catch (error) {
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       setLoading(false)
     }
@@ -361,7 +363,7 @@ function OperationTemplateMaster({
       const data = await getOperationTemplateLayouts(templateId)
       setLayouts(data)
     } catch (error) {
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       setLayoutLoading(false)
     }
@@ -375,7 +377,7 @@ function OperationTemplateMaster({
 
   const handleInitializeLayoutDraft = () => {
     if (fieldOptions.length === 0) {
-      alert('Please add fields before configuring layout.')
+      setErrorMsg('Please add fields before configuring layout.')
       return
     }
     setSelectedLayoutId('')
@@ -425,7 +427,7 @@ function OperationTemplateMaster({
         items,
       })
     } catch (error) {
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       setLayoutLoading(false)
     }
@@ -465,7 +467,7 @@ function OperationTemplateMaster({
   const handleRemoveSection = (localId) => {
     const inUse = layoutDraft.items.some((item) => item.sectionRef === localId)
     if (inUse) {
-      alert('Cannot remove a section that still contains fields.')
+      setErrorMsg('Cannot remove a section that still contains fields.')
       return
     }
     setLayoutDraft((prev) => ({
@@ -533,19 +535,19 @@ function OperationTemplateMaster({
 
   const handleLayoutSave = async () => {
     if (!editId) {
-      alert('Save the template first, then configure layout.')
+      setErrorMsg('Save the template first, then configure layout.')
       return
     }
     if (String(layoutDraft.layoutName || '').trim() === '') {
-      alert('Layout Name is required.')
+      setErrorMsg('Layout Name is required.')
       return
     }
     if (layoutDraft.sections.length === 0) {
-      alert('At least one section is required.')
+      setErrorMsg('At least one section is required.')
       return
     }
     if (layoutDraft.items.length === 0) {
-      alert('At least one layout item is required.')
+      setErrorMsg('At least one layout item is required.')
       return
     }
 
@@ -574,11 +576,11 @@ function OperationTemplateMaster({
     }))
 
     if (itemPayload.some((item) => Number.isNaN(item.fieldId))) {
-      alert('All layout items must have a valid field.')
+      setErrorMsg('All layout items must have a valid field.')
       return
     }
     if (itemPayload.some((item) => !item.sectionId)) {
-      alert('Each layout item must be mapped to a valid section.')
+      setErrorMsg('Each layout item must be mapped to a valid section.')
       return
     }
 
@@ -586,24 +588,24 @@ function OperationTemplateMaster({
     const occupied = new Set()
     for (const item of itemPayload) {
       if (seenFields.has(item.fieldId)) {
-        alert('Each field can be placed only once in a layout.')
+        setErrorMsg('Each field can be placed only once in a layout.')
         return
       }
       seenFields.add(item.fieldId)
 
       if (item.colStart <= 0 || item.colSpan <= 0 || item.rowNo <= 0) {
-        alert('Row, column and span values must be greater than 0.')
+        setErrorMsg('Row, column and span values must be greater than 0.')
         return
       }
       if (item.colStart + item.colSpan - 1 > 3) {
-        alert('Layout grid supports maximum 3 columns.')
+        setErrorMsg('Layout grid supports maximum 3 columns.')
         return
       }
 
       for (let col = item.colStart; col < item.colStart + item.colSpan; col += 1) {
         const key = `${item.sectionId}|${item.rowNo}|${col}`
         if (occupied.has(key)) {
-          alert('Overlapping cells detected in the same section row.')
+          setErrorMsg('Overlapping cells detected in the same section row.')
           return
         }
         occupied.add(key)
@@ -620,7 +622,7 @@ function OperationTemplateMaster({
           sections: sectionPayload,
           items: itemPayload,
         })
-        alert('Layout updated successfully')
+        setSuccessMsg('Layout updated successfully')
       } else {
         await createOperationTemplateLayout(editId, {
           layoutName: layoutDraft.layoutName,
@@ -630,12 +632,12 @@ function OperationTemplateMaster({
           sections: sectionPayload,
           items: itemPayload,
         })
-        alert('Layout created successfully')
+        setSuccessMsg('Layout created successfully')
       }
 
       await loadTemplateLayouts(editId)
     } catch (error) {
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       setLayoutLoading(false)
     }
@@ -655,6 +657,38 @@ function OperationTemplateMaster({
 
   return (
     <div>
+      {successMsg && (
+        <div className="success-box" onClick={() => setSuccessMsg('')}>
+          {successMsg}
+        </div>
+      )}
+      {errorMsg && (
+        <div className="error-box" onClick={() => setErrorMsg('')}>
+          {errorMsg}
+        </div>
+      )}
+      {confirmRemoveField !== null && (
+        <div className="confirm-overlay">
+          <div className="confirm-dialog">
+            <p>Are you sure you want to remove this field?</p>
+            <div className="confirm-actions">
+              <button onClick={confirmRemoveFieldAction}>Yes</button>
+              <button onClick={() => setConfirmRemoveField(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {confirmDeleteTemplate && (
+        <div className="confirm-overlay">
+          <div className="confirm-dialog">
+            <p>Are you sure you want to delete this operation template?</p>
+            <div className="confirm-actions">
+              <button onClick={confirmDeleteTemplateAction}>Yes</button>
+              <button onClick={() => setConfirmDeleteTemplate(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="page-title">
         <div>
           <div className="title-with-help">

@@ -10,6 +10,7 @@ function AssetCalibrationTable({
   calibrationTemplates,
   calibrationTables,
   reloadAssetCalibrationTables,
+  loggedInUser,
 }) {
   const emptyForm = {
     calibrationName: '',
@@ -31,8 +32,26 @@ function AssetCalibrationTable({
   const [uploadedRows, setUploadedRows] = useState([])
   const [uploadValidationErrors, setUploadValidationErrors] = useState([])
   const [showUploadHelp, setShowUploadHelp] = useState(false)
+  const [successMsg, setSuccessMsg] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
+  const [validationErrors, setValidationErrors] = useState({})
+  const [confirmRemoveRowIndex, setConfirmRemoveRowIndex] = useState(null)
+  const [confirmClearRows, setConfirmClearRows] = useState(false)
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null)
 
   const visibleRowLimit = 10
+
+  const isAdminBootstrap =
+    loggedInUser &&
+    loggedInUser.username === 'admin'
+  const hasPermission = (permissionName) => {
+    if (isAdminBootstrap) return true
+    if (!loggedInUser || !Array.isArray(loggedInUser.permissions)) return false
+    return loggedInUser.permissions.some(
+      (p) => p.permissionName === permissionName
+    )
+  }
+  const canManageAssetCalibration = hasPermission('Manage Asset Calibration')
 
   const activeAssets = assets.filter((asset) => asset.status === 'Active')
   const activeTemplates = calibrationTemplates.filter(
@@ -154,8 +173,11 @@ function AssetCalibrationTable({
   }
 
   const handleAddRow = () => {
+    setSuccessMsg('')
+    setErrorMsg('')
+
     if (!selectedTemplate) {
-      alert('Please select a calibration template first')
+      setErrorMsg('Please select a calibration template first')
       return
     }
 
@@ -164,7 +186,7 @@ function AssetCalibrationTable({
         const value = rowData[column.columnName]
 
         if (value === undefined || String(value).trim() === '') {
-          alert(`${column.columnName} is required`)
+          setErrorMsg(`${column.columnName} is required`)
           return
         }
       }
@@ -187,19 +209,12 @@ function AssetCalibrationTable({
     setRowData({})
   }
 
-  const handleRemoveRow = (indexToRemove) => {
-    const confirmRemove = window.confirm(
-      'Are you sure you want to remove this row?'
-    )
-
-    if (confirmRemove === false) {
-      return
-    }
-
+  const confirmRemoveRow = () => {
     setFormData({
       ...formData,
-      rows: formData.rows.filter((row, index) => index !== indexToRemove),
+      rows: formData.rows.filter((row, index) => index !== confirmRemoveRowIndex),
     })
+    setConfirmRemoveRowIndex(null)
   }
 
   const parseCsvText = (csvText) => {
@@ -360,11 +375,13 @@ function AssetCalibrationTable({
 
   const handleFileUpload = async (e) => {
     const selectedFile = e.target.files[0]
+    setSuccessMsg('')
+    setErrorMsg('')
 
     resetUploadState()
 
     if (!selectedTemplate) {
-      alert('Please select Asset and Calibration Template before uploading file')
+      setErrorMsg('Please select Asset and Calibration Template before uploading file')
       e.target.value = ''
       return
     }
@@ -377,7 +394,7 @@ function AssetCalibrationTable({
     const fileExtension = fileName.split('.').pop().toLowerCase()
 
     if (fileExtension !== 'csv') {
-      alert('XLSX upload disabled. Upload CSV.')
+      setErrorMsg('XLSX upload disabled. Upload CSV.')
       e.target.value = ''
       return
     }
@@ -396,21 +413,24 @@ function AssetCalibrationTable({
       setUploadValidationErrors(validationResult.errors)
 
       if (validationResult.errors.length > 0) {
-        alert('Uploaded file has validation errors. Please review below.')
+        setErrorMsg('Uploaded file has validation errors. Please review below.')
       } else {
-        alert(`${validationResult.rows.length} rows parsed successfully`)
+        setSuccessMsg(`${validationResult.rows.length} rows parsed successfully`)
       }
     } catch (error) {
       setUploadValidationErrors([error.message])
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       e.target.value = ''
     }
   }
 
   const handleUseUploadedRows = () => {
+    setSuccessMsg('')
+    setErrorMsg('')
+
     if (uploadedRows.length === 0) {
-      alert('No valid uploaded rows available')
+      setErrorMsg('No valid uploaded rows available')
       return
     }
 
@@ -419,12 +439,15 @@ function AssetCalibrationTable({
       rows: uploadedRows,
     })
 
-    alert('Uploaded rows added to calibration table')
+    setSuccessMsg('Uploaded rows added to calibration table')
   }
 
   const handleAppendUploadedRows = () => {
+    setSuccessMsg('')
+    setErrorMsg('')
+
     if (uploadedRows.length === 0) {
-      alert('No valid uploaded rows available')
+      setErrorMsg('No valid uploaded rows available')
       return
     }
 
@@ -433,44 +456,50 @@ function AssetCalibrationTable({
       rows: [...formData.rows, ...uploadedRows],
     })
 
-    alert('Uploaded rows appended to calibration table')
+    setSuccessMsg('Uploaded rows appended to calibration table')
   }
 
-  const handleClearRows = () => {
-    const confirmClear = window.confirm(
-      'Are you sure you want to clear all calibration rows?'
-    )
-
-    if (confirmClear === false) {
-      return
-    }
-
+  const confirmClearAllRows = () => {
     setFormData({
       ...formData,
       rows: [],
     })
+    setConfirmClearRows(false)
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
 
-    if (formData.calibrationName.trim() === '') {
-      alert('Calibration Name is required')
+    if (!canManageAssetCalibration) {
+      setErrorMsg('You do not have permission to manage asset calibration tables.')
       return
+    }
+
+    setSuccessMsg('')
+    setErrorMsg('')
+    setValidationErrors({})
+
+    const errors = {}
+
+    if (formData.calibrationName.trim() === '') {
+      errors.calibrationName = 'Calibration Name is required'
     }
 
     if (formData.assetCode.trim() === '') {
-      alert('Asset is required')
-      return
+      errors.assetCode = 'Asset is required'
     }
 
     if (String(formData.templateId).trim() === '') {
-      alert('Calibration Template is required')
-      return
+      errors.templateId = 'Calibration Template is required'
     }
 
     if (formData.rows.length === 0) {
-      alert('Please add or upload at least one calibration data row')
+      errors.rows = 'Please add or upload at least one calibration data row'
+    }
+
+    setValidationErrors(errors)
+
+    if (Object.keys(errors).length > 0) {
       return
     }
 
@@ -479,10 +508,10 @@ function AssetCalibrationTable({
 
       if (editId === null) {
         await createAssetCalibrationTable(formData)
-        alert('Asset Calibration Table saved successfully')
+        setSuccessMsg('Asset Calibration Table saved successfully')
       } else {
         await updateAssetCalibrationTable(editId, formData)
-        alert('Asset Calibration Table updated successfully')
+        setSuccessMsg('Asset Calibration Table updated successfully')
       }
 
       await reloadAssetCalibrationTables()
@@ -491,13 +520,18 @@ function AssetCalibrationTable({
       setEditId(null)
       resetUploadState()
     } catch (error) {
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       setLoading(false)
     }
   }
 
   const handleEdit = (table) => {
+    if (!canManageAssetCalibration) {
+      setErrorMsg('You do not have permission to manage asset calibration tables.')
+      return
+    }
+
     setFormData({
       calibrationName: table.calibrationName,
       assetCode: table.assetCode,
@@ -513,30 +547,31 @@ function AssetCalibrationTable({
     setEditId(table.id)
   }
 
-  const handleDelete = async (tableId) => {
-    const confirmDelete = window.confirm(
-      'Are you sure you want to delete this calibration table?'
-    )
-
-    if (confirmDelete === false) {
+  const handleDelete = async () => {
+    if (!canManageAssetCalibration) {
+      setErrorMsg('You do not have permission to manage asset calibration tables.')
       return
     }
 
+    setSuccessMsg('')
+    setErrorMsg('')
+
     try {
       setLoading(true)
-      await deleteAssetCalibrationTable(tableId)
+      await deleteAssetCalibrationTable(confirmDeleteId)
       await reloadAssetCalibrationTables()
 
-      if (editId === tableId) {
+      if (editId === confirmDeleteId) {
         setFormData(emptyForm)
         setRowData({})
         setEditId(null)
         resetUploadState()
       }
 
-      alert('Asset Calibration Table deleted successfully')
+      setConfirmDeleteId(null)
+      setSuccessMsg('Asset Calibration Table deleted successfully')
     } catch (error) {
-      alert(error.message)
+      setErrorMsg(error.message)
     } finally {
       setLoading(false)
     }
@@ -688,6 +723,66 @@ function AssetCalibrationTable({
         </div>
       )}
 
+      {successMsg && (
+        <div className="success-box">{successMsg}</div>
+      )}
+
+      {errorMsg && (
+        <div className="error-box">{errorMsg}</div>
+      )}
+
+      {confirmRemoveRowIndex !== null && (
+        <div className="confirm-overlay">
+          <div className="confirm-box">
+            <p>Are you sure you want to remove this row?</p>
+            <div className="confirm-actions">
+              <button onClick={confirmRemoveRow}>Yes, Remove</button>
+              <button onClick={() => setConfirmRemoveRowIndex(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmClearRows && (
+        <div className="confirm-overlay">
+          <div className="confirm-box">
+            <p>Are you sure you want to clear all calibration rows?</p>
+            <div className="confirm-actions">
+              <button onClick={confirmClearAllRows}>Yes, Clear</button>
+              <button onClick={() => setConfirmClearRows(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmDeleteId && (
+        <div className="confirm-overlay">
+          <div className="confirm-box">
+            <p>Are you sure you want to delete this calibration table?</p>
+            <div className="confirm-actions">
+              <button onClick={handleDelete} disabled={loading}>
+                {loading ? 'Deleting...' : 'Yes, Delete'}
+              </button>
+              <button onClick={() => setConfirmDeleteId(null)} disabled={loading}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {validationErrors.rows && (
+        <div className="error-box">{validationErrors.rows}</div>
+      )}
+
+      {!canManageAssetCalibration && (
+        <div className="info-box">
+          You are in view-only mode. Contact an administrator to make changes to
+          asset calibration tables.
+        </div>
+      )}
+
+      {canManageAssetCalibration && (
       <form onSubmit={handleSubmit}>
         <div>
           <label>Calibration Name</label>
@@ -695,9 +790,13 @@ function AssetCalibrationTable({
             name="calibrationName"
             type="text"
             value={formData.calibrationName}
-            onChange={handleFormChange}
+            onChange={(e) => { handleFormChange(e); setValidationErrors({ ...validationErrors, calibrationName: '' }) }}
             placeholder="Example: Tank 101 Dip Table 2026"
+            className={validationErrors.calibrationName ? 'input-error' : ''}
           />
+          {validationErrors.calibrationName && (
+            <span className="field-error">{validationErrors.calibrationName}</span>
+          )}
         </div>
 
         <div>
@@ -705,7 +804,8 @@ function AssetCalibrationTable({
           <select
             name="assetCode"
             value={formData.assetCode}
-            onChange={handleFormChange}
+            onChange={(e) => { handleFormChange(e); setValidationErrors({ ...validationErrors, assetCode: '' }) }}
+            className={validationErrors.assetCode ? 'input-error' : ''}
           >
             <option value="">Select Asset</option>
 
@@ -715,6 +815,9 @@ function AssetCalibrationTable({
               </option>
             ))}
           </select>
+          {validationErrors.assetCode && (
+            <span className="field-error">{validationErrors.assetCode}</span>
+          )}
         </div>
 
         <div>
@@ -722,8 +825,9 @@ function AssetCalibrationTable({
           <select
             name="templateId"
             value={formData.templateId}
-            onChange={handleFormChange}
+            onChange={(e) => { handleFormChange(e); setValidationErrors({ ...validationErrors, templateId: '' }) }}
             disabled={!selectedAsset}
+            className={validationErrors.templateId ? 'input-error' : ''}
           >
             <option value="">
               {selectedAsset
@@ -933,7 +1037,7 @@ function AssetCalibrationTable({
               </button>
 
               {formData.rows.length > 0 && (
-                <button type="button" onClick={handleClearRows} disabled={loading}>
+                <button type="button" onClick={() => { setSuccessMsg(''); setErrorMsg(''); setConfirmClearRows(true) }} disabled={loading}>
                   Clear Rows
                 </button>
               )}
@@ -977,7 +1081,7 @@ function AssetCalibrationTable({
                     <td>
                       <button
                         type="button"
-                        onClick={() => handleRemoveRow(rowIndex)}
+                        onClick={() => { setSuccessMsg(''); setErrorMsg(''); setConfirmRemoveRowIndex(rowIndex) }}
                         disabled={loading}
                       >
                         Remove
@@ -1013,6 +1117,7 @@ function AssetCalibrationTable({
           )}
         </div>
       </form>
+      )}
 
       <div className="section-title">
         <h3>Saved Asset Calibration Tables</h3>
@@ -1055,13 +1160,17 @@ function AssetCalibrationTable({
                   </span>
                 </td>
                 <td>
-                  <button type="button" onClick={() => handleEdit(table)}>
-                    Edit
-                  </button>
+                  {canManageAssetCalibration && (
+                    <button type="button" onClick={() => handleEdit(table)}>
+                      Edit
+                    </button>
+                  )}
 
-                  <button type="button" onClick={() => handleDelete(table.id)}>
-                    Delete
-                  </button>
+                  {canManageAssetCalibration && (
+                    <button type="button" onClick={() => { setSuccessMsg(''); setErrorMsg(''); setConfirmDeleteId(table.id) }}>
+                      Delete
+                    </button>
+                  )}
                 </td>
               </tr>
             ))
